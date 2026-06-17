@@ -1,26 +1,26 @@
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+# c:\projo\models.py
+import json
 
-# Initialize the database object, but without binding it to an app yet.
-# The app will be bound in app.py.
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timedelta
+
+# Initialize the database object. The app will be bound in app.py.
 db = SQLAlchemy()
 
 # --- Database Models ---
 
 class User(db.Model):
-    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    role = db.Column(db.String(50), nullable=False)
-    municipality = db.Column(db.String(50), nullable=False)
-
+    name = db.Column(db.String(100))
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(200))
+    role = db.Column(db.String(50))
+    municipality = db.Column(db.String(50))
+    last_seen = db.Column(db.String(50), default='')  # <-- NEW: Tracks activity
+    
     def to_dict(self):
-        return {
-            'id': self.id, 'name': self.name, 'email': self.email,
-            'role': self.role, 'municipality': self.municipality
-        }
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
 
 class Member(db.Model):
     __tablename__ = 'members'
@@ -29,7 +29,7 @@ class Member(db.Model):
     email = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    joined = db.Column(db.String, nullable=False) # Stored as 'YYYY-MM-DD'
+    joined = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
 
     def to_dict(self):
         return {
@@ -37,24 +37,30 @@ class Member(db.Model):
             'role': self.role, 'municipality': self.municipality, 'joined': self.joined
         }
 
-class Meeting(db.Model):
-    __tablename__ = 'meetings'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    date = db.Column(db.String, nullable=False) # Stored as 'YYYY-MM-DD'
-    time = db.Column(db.String, nullable=False)
-    location = db.Column(db.String(200), nullable=False)
-    municipality = db.Column(db.String(50), nullable=False)
-    status = db.Column(db.String(50), nullable=False)
-    # Attendees is a list of emails. We'll store it as a JSON string in the DB.
-    attendees = db.Column(db.Text, default='[]') 
 
+class Meeting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200))
+    date = db.Column(db.String(20))
+    time = db.Column(db.String(20))
+    location = db.Column(db.String(200))
+    municipality = db.Column(db.String(50))
+    status = db.Column(db.String(50))
+    attendees = db.Column(db.Text)  # Stored as JSON string
+    declined = db.Column(db.Text)   # NEW: Stored as JSON string
+    
     def to_dict(self):
-        return {
-            'id': self.id, 'title': self.title, 'date': self.date, 'time': self.time,
-            'location': self.location, 'municipality': self.municipality,
-            'status': self.status, 'attendees': eval(self.attendees) if self.attendees else []
-        }
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        try:
+            d['attendees'] = json.loads(d['attendees']) if d['attendees'] else []
+        except:
+            d['attendees'] = []
+        try:
+            d['declined'] = json.loads(d['declined']) if d['declined'] else []
+        except:
+            d['declined'] = []
+        return d
+
 
 class Complaint(db.Model):
     __tablename__ = 'complaints'
@@ -64,14 +70,19 @@ class Complaint(db.Model):
     municipality = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False)
     assignedTo = db.Column(db.String(100), default='')
-    date = db.Column(db.String, nullable=False) # Stored as 'YYYY-MM-DD'
+    date = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
 
     def to_dict(self):
         return {
-            'id': self.id, 'title': self.title, 'description': self.description,
-            'municipality': self.municipality, 'status': self.status,
-            'assignedTo': self.assignedTo, 'date': self.date
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'municipality': self.municipality,
+            'status': self.status,
+            'assignedTo': self.assignedTo,
+            'date': self.date
         }
+
 
 class Minute(db.Model):
     __tablename__ = 'minutes'
@@ -80,13 +91,18 @@ class Minute(db.Model):
     content = db.Column(db.Text, nullable=False)
     uploadedBy = db.Column(db.String(100), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    uploadDate = db.Column(db.String, nullable=False) # Stored as 'YYYY-MM-DD'
+    uploadDate = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
 
     def to_dict(self):
         return {
-            'id': self.id, 'meetingId': self.meetingId, 'content': self.content,
-            'uploadedBy': self.uploadedBy, 'municipality': self.municipality, 'uploadDate': self.uploadDate
+            'id': self.id,
+            'meetingId': self.meetingId,
+            'content': self.content,
+            'uploadedBy': self.uploadedBy,
+            'municipality': self.municipality,
+            'uploadDate': self.uploadDate
         }
+
 
 class Document(db.Model):
     __tablename__ = 'documents'
@@ -95,12 +111,58 @@ class Document(db.Model):
     type = db.Column(db.String(50), nullable=False)
     uploadedBy = db.Column(db.String(100), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    uploadDate = db.Column(db.String, nullable=False) # Stored as 'YYYY-MM-DD'
+    uploadDate = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
     fileName = db.Column(db.String(255), nullable=False)
 
     def to_dict(self):
         return {
-            'id': self.id, 'name': self.name, 'type': self.type,
-            'uploadedBy': self.uploadedBy, 'municipality': self.municipality,
-            'uploadDate': self.uploadDate, 'fileName': self.fileName
+            'id': self.id,
+            'name': self.name,
+            'type': self.type,
+            'uploadedBy': self.uploadedBy,
+            'municipality': self.municipality,
+            'uploadDate': self.uploadDate,
+            'fileName': self.fileName
+        }
+
+
+class Email(db.Model):
+    __tablename__ = 'emails'
+    id = db.Column(db.Integer, primary_key=True)
+    from_email = db.Column(db.String(120), nullable=False)
+    to_email = db.Column(db.String(120), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.String, nullable=False)
+    read = db.Column(db.Boolean, default=False, nullable=False)
+    municipality = db.Column(db.String(50), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'from': self.from_email,
+            'to': self.to_email,
+            'subject': self.subject,
+            'body': self.body,
+            'timestamp': self.timestamp,
+            'read': self.read,
+            'municipality': self.municipality
+        }
+
+
+class Broadcast(db.Model):
+    __tablename__ = 'broadcasts'
+    id = db.Column(db.Integer, primary_key=True)
+    message = db.Column(db.Text, nullable=False)
+    sender = db.Column(db.String(100), nullable=False)
+    timestamp = db.Column(db.String, nullable=False)
+    municipality = db.Column(db.String(50), nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'message': self.message,
+            'sender': self.sender,
+            'timestamp': self.timestamp,
+            'municipality': self.municipality
         }

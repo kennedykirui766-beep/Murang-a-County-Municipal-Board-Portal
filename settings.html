@@ -66,5 +66,15 @@
   </main>
 
   <script src="app_backend.js"></script>
+
+  <!-- Fine Print Footer for Settings Page -->
+<footer style="text-align: center; padding: 1.5rem; font-size: 0.75rem; color: #666; border-top: 1px solid #eee; margin-top: 2rem;">
+  <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
+  <p>For technical support, please contact the IT Department.</p>
+</footer>
+
+<script>
+  document.getElementById('currentYear').textContent = new Date().getFullYear();
+</script>
 </body>
 </html>

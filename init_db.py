@@ -1,6 +1,6 @@
 # c:\projo\init_db.py
 from app import app, db
-from models import User, Member, Meeting, Complaint, Minute, Document
+from models import Broadcast, Email, User, Member, Meeting, Complaint, Minute, Document
 from datetime import date
 from werkzeug.security import generate_password_hash
 
@@ -24,7 +24,8 @@ def seed_database():
             email='dev@muranga.go.ke', 
             password=generate_password_hash('dev123'), 
             role='super_admin', 
-            municipality='all'
+            municipality='all',
+            last_seen=''
         )
 
         # --- 2. The Three Municipal Officers ---
@@ -34,21 +35,24 @@ def seed_database():
                 email='officer.kenol@muranga.go.ke', 
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
-                municipality='kenol'
+                municipality='kenol',
+                last_seen=''
             ),
             User(
                 name='Kangare Municipal Officer', 
                 email='officer.kangare@muranga.go.ke', 
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
-                municipality='kangare'
+                municipality='kangare',
+                last_seen=''
             ),
             User(
                 name="Murang'a Town Municipal Officer", 
                 email='officer.muranga@muranga.go.ke', 
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
-                municipality='muranga_town'
+                municipality='muranga_town',
+                last_seen=''
             )
         ]
 
@@ -58,7 +62,8 @@ def seed_database():
             email='jane@citizen.go.ke', 
             password=generate_password_hash('member123'), 
             role='member', 
-            municipality='kenol'
+            municipality='kenol',
+            last_seen=''
         )
 
         db.session.add(super_admin)
@@ -73,9 +78,9 @@ def seed_database():
         db.session.add_all(members_data)
 
         meetings_data = [
-            Meeting(title='Kenol Budget Meeting', date='2026-06-20', time='10:00', location='Kenol Hall', municipality='kenol', status='scheduled', attendees='[]'),
-            Meeting(title='Kangare Development Forum', date='2026-06-22', time='14:00', location='Kangare Centre', municipality='kangare', status='scheduled', attendees='[]'),
-            Meeting(title="Murang'a Town Council", date='2026-06-25', time='09:30', location='Town Hall', municipality='muranga_town', status='scheduled', attendees='[]')
+            Meeting(title='Kenol Budget Meeting', date='2026-06-20', time='10:00', location='Kenol Hall', municipality='kenol', status='scheduled', attendees='[]', declined='[]'),
+            Meeting(title='Kangare Development Forum', date='2026-06-22', time='14:00', location='Kangare Centre', municipality='kangare', status='scheduled', attendees='[]', declined='[]'),
+            Meeting(title="Murang'a Town Council", date='2026-06-25', time='09:30', location='Town Hall', municipality='muranga_town', status='scheduled', attendees='[]', declined='[]')
         ]
         db.session.add_all(meetings_data)
 
@@ -92,6 +97,66 @@ def seed_database():
         print("Municipal Officers: officer.[municipality]@muranga.go.ke / officer123")
         print("Sample Member: jane@citizen.go.ke / member123")
         print("-------------------")
+
+        # c:\projo\init_db.py (inside seed_database function)
+
+        # ... (previous seeding) ...
+
+        # --- Emails ---
+        # We use datetime.utcnow() to get the current server time for "new" emails
+        from datetime import datetime, timedelta
+        
+        emails_data = [
+            {
+                'from_email': 'system@muranga.go.ke',  # <-- Changed from 'from' to 'from_'
+                'to_email': 'admin@muranga.go.ke',
+                'subject': 'Welcome to the Municipal Board Portal',
+                'body': 'Welcome to the Murang\'a County Municipal Board Portal. This system helps manage board activities, meetings, complaints, and communications.',
+                'timestamp': (datetime.utcnow() - timedelta(days=1)).isoformat(),
+                'read': False,
+                'municipality': 'all'
+            },
+            {
+                'from_email': 'kenol@muranga.go.ke',  # <-- Changed
+                'to_email': 'admin@muranga.go.ke',
+                'subject': 'Kenol Budget Meeting Update',
+                'body': 'The Kenol budget meeting scheduled for June 20th has been confirmed. All board members are requested to attend.',
+                'timestamp': (datetime.utcnow() - timedelta(hours=12)).isoformat(),
+                'read': False,
+                'municipality': 'kenol'
+            },
+            {
+                'from_email': 'social@muranga.go.ke',  # <-- Changed
+                'to_email': 'all',
+                'subject': 'Community Outreach Program',
+                'body': 'The social department is organizing a community outreach program next month. We request all municipalities to participate.',
+                'timestamp': (datetime.utcnow() - timedelta(hours=6)).isoformat(),
+                'read': False,
+                'municipality': 'all'
+            }
+        ]
+        for email in emails_data:
+            db.session.add(Email(**email))
+
+        # --- Broadcasts ---
+        broadcasts_data = [
+            {
+                'message': 'Welcome to the Murang\'a County Municipal Board Portal! Please familiarize yourself with the system.',
+                'sender': 'System Admin',
+                'timestamp': (datetime.utcnow() - timedelta(days=2)).isoformat(),
+                'municipality': 'all'
+            },
+            {
+                'message': 'Important: The upcoming budget review meeting for all municipalities has been rescheduled to July 5th.',
+                'sender': 'System Admin',
+                'timestamp': (datetime.utcnow() - timedelta(days=1)).isoformat(),
+                'municipality': 'all'
+            }
+        ]
+        for broadcast in broadcasts_data:
+            db.session.add(Broadcast(**broadcast))
+
+        # ... (db.session.commit()) ...
 
 
 if __name__ == '__main__':

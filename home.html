@@ -45,13 +45,22 @@
         <div class="nav-item" data-page="minutes"><i class="fas fa-file-alt"></i> Minutes</div>
         <div class="nav-item" data-page="complaints"><i class="fas fa-exclamation-triangle"></i> Complaints</div>
         <div class="nav-item" data-page="documents"><i class="fas fa-folder-open"></i> Documents</div>
-        <div class="nav-section">System</div>
+          <div class="nav-section">System</div>
         <div class="nav-item" data-page="users" id="navUsers"><i class="fas fa-user-cog"></i> Manage Users</div>
+        <div class="nav-item" data-page="track" id="navTrack" style="display:none;"><i class="fas fa-map-marker-alt"></i> Track Users</div>
+        <div class="nav-item" data-page="broadcasts"><i class="fas fa-bullhorn"></i> Announcements</div>
         <a class="nav-item" href="settings.html"><i class="fas fa-cog"></i> Settings</a>
       </aside>
 
       <main class="main-content" id="mainContent">
+        <!-- Javascript injects content here -->
         <div id="pageContainer"></div>
+        
+        <!-- FINE PRINT FOOTER -->
+        <footer style="text-align: center; padding: 1.5rem 1rem; font-size: 0.75rem; color: var(--text-muted, #666); border-top: 1px solid var(--border, #eee); margin-top: 2rem;">
+          <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
+          <p>This system contains confidential information intended only for authorized personnel. Unauthorized access, use, or disclosure of information contained in this system is strictly prohibited and a violation of security policies.</p>
+        </footer>
       </main>
     </div>
   </div>
@@ -62,6 +71,11 @@
       <div id="modalBody"></div>
     </div>
   </div>
+
+  <!-- Script to automatically update the year -->
+  <script>
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+  </script>
 
   <script src="app_backend.js"></script>
 </body>

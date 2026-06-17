@@ -34,6 +34,7 @@ def settings():
 @app.route('/api/login', methods=['POST'])
 def login():
     from models import User
+    from datetime import datetime
     
     credentials = request.json
     email = credentials.get('email')
@@ -41,11 +42,72 @@ def login():
     
     user = User.query.filter_by(email=email).first()
     
-    # Use check_password_hash to verify the credentials
     if user and check_password_hash(user.password, password):
+        user.last_seen = datetime.utcnow().isoformat() # <-- ADD THIS LINE
+        db.session.commit()
         return jsonify(user.to_dict()), 200
     else:
         return jsonify({'error': 'Invalid email or password'}), 401
+    
+@app.route('/api/oauth-login', methods=['POST'])
+def oauth_login():
+    from models import User, Member
+    from datetime import datetime, date
+    import secrets
+    
+    data = request.json
+    email = data.get('email')
+    name = data.get('name')
+    provider = data.get('provider', 'google')
+    
+    if not email or not name:
+        return jsonify({'error': 'Name and email are required'}), 400
+        
+    user = User.query.filter_by(email=email).first()
+    
+    if not user:
+        # Create user if they don't exist
+        random_pass = secrets.token_urlsafe(16)
+        user = User(
+            name=name,
+            email=email,
+            password=generate_password_hash(random_pass),
+            role='member',
+            municipality='all',
+            last_seen=datetime.utcnow().isoformat()
+        )
+        db.session.add(user)
+        
+        # Also add to members table
+        new_member = Member(
+            name=name,
+            email=email,
+            role='member',
+            municipality='all',
+            joined=str(date.today())
+        )
+        db.session.add(new_member)
+        db.session.commit()
+    else:
+        user.last_seen = datetime.utcnow().isoformat()
+        db.session.commit()
+        
+    return jsonify(user.to_dict()), 200    
+    
+@app.route('/api/heartbeat', methods=['POST'])
+def heartbeat():
+    from models import User
+    from datetime import datetime
+    
+    data = request.json
+    user_id = data.get('user_id')
+    
+    user = User.query.get(user_id)
+    if user:
+        user.last_seen = datetime.utcnow().isoformat()
+        db.session.commit()
+        return jsonify({'status': 'success'}), 200
+    return jsonify({'error': 'User not found'}), 404    
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -78,10 +140,11 @@ def register():
     return jsonify(new_user.to_dict()), 201
 
 def get_model(entity_name):
-    from models import User, Member, Meeting, Complaint, Minute, Document
+    from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast
     return {
         'users': User, 'members': Member, 'meetings': Meeting,
-        'complaints': Complaint, 'minutes': Minute, 'documents': Document
+        'complaints': Complaint, 'minutes': Minute, 'documents': Document,
+        'emails': Email, 'broadcasts': Broadcast  
     }.get(entity_name)
 
 @app.route('/api/<entity>', methods=['GET'])
@@ -109,6 +172,7 @@ def add_entity_item(entity):
     
     if entity == 'meetings':
         data['attendees'] = str(data.get('attendees', []))
+        data['declined'] = str(data.get('declined', []))
 
     new_item = Model(**data)
     db.session.add(new_item)
@@ -133,6 +197,7 @@ def update_entity_item(entity, item_id):
 
     if entity == 'meetings':
         updated_data['attendees'] = str(updated_data.get('attendees', []))
+        updated_data['declined'] = str(updated_data.get('declined', []))
 
     for key, value in updated_data.items():
         if hasattr(item, key):
@@ -177,6 +242,7 @@ def replace_entity_list(entity):
             item_data['password'] = generate_password_hash(item_data.get('password'))
         if entity == 'meetings':
             item_data['attendees'] = str(item_data.get('attendees', []))
+            item_data['declined'] = str(item_data.get('declined', []))
         new_items.append(Model(**item_data))
         
     db.session.add_all(new_items)

@@ -11,6 +11,8 @@ const DB = {
         } catch (err) { return def; }
     },
     set(key, value) { localStorage.setItem(this.prefix + key, JSON.stringify(value)); },
+    
+    // --- Database-backed methods ---
     async users() { return await this._fetchData('users'); },
     async setUsers(users) { await this._replaceData('users', users); },
     async members() { return await this._fetchData('members'); },
@@ -23,7 +25,14 @@ const DB = {
     async setComplaints(complaints) { await this._replaceData('complaints', complaints); },
     async documents() { return await this._fetchData('documents'); },
     async setDocuments(documents) { await this._replaceData('documents', documents); },
+    
+    // --- New Email & Broadcast methods ---
+    async emails() { return await this._fetchData('emails'); },
+    async setEmails(emails) { await this._replaceData('emails', emails); },
+    async broadcasts() { return await this._fetchData('broadcasts'); },
+    async setBroadcasts(broadcasts) { await this._replaceData('broadcasts', broadcasts); },
 
+    // --- API Helpers ---
     async _fetchData(entity) {
         try {
             const response = await fetch(`${API_BASE_URL}/${entity}`);
@@ -52,7 +61,6 @@ const DB = {
             return await response.json();
         } catch (error) { console.error(`Error adding item:`, error); return null; }
     },
-    // New helper for efficient single-record deletion
     async _deleteItem(entity, id) {
         try {
             const response = await fetch(`${API_BASE_URL}/${entity}/${id}`, {
@@ -69,14 +77,35 @@ const DB = {
             return false;
         }
     },
+    async _updateItem(entity, id, data) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/${entity}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                console.error(`Error updating item from ${entity}:`, response.statusText);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error(`Error updating item:`, error);
+            return false;
+        }
+    },
+
+    // --- Database Adders ---
     async addUser(user) { return await this._addItem('users', user); },
     async addMember(member) { return await this._addItem('members', member); },
     async addMeeting(meeting) { return await this._addItem('meetings', meeting); },
     async addMinute(minute) { return await this._addItem('minutes', minute); },
     async addComplaint(complaint) { return await this._addItem('complaints', complaint); },
     async addDocument(document) { return await this._addItem('documents', document); },
+    async addEmail(email) { return await this._addItem('emails', email); },
+    async addBroadcast(broadcast) { return await this._addItem('broadcasts', broadcast); },
 
-    // New helper for public registration
+    // Public registration
     async registerUser(user) {
         try {
             const response = await fetch(`${API_BASE_URL}/register`, {
@@ -191,11 +220,13 @@ function showAppInfo() {
   if (nameEl) nameEl.textContent = currentUser.name;
   if (roleEl) roleEl.textContent = getRoleLabel(currentUser.role);
   if (muniEl) muniEl.textContent = currentUser.municipality === 'all' ? 'All Municipalities' : getMunicipalityLabel(currentUser.municipality);
+  
   const usersNav = byId('navUsers');
-  // Only Super Admin can see the "Manage Users" tab
-  if (usersNav) {
-    usersNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
-  }
+  if (usersNav) usersNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
+  
+  // Show Track Users link only for Super Admin
+  const trackNav = byId('navTrack');
+  if (trackNav) trackNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
 }
 
 function render(html) {
@@ -214,6 +245,9 @@ async function navigate(page) {
     case 'complaints': await renderComplaints(); break;
     case 'documents': await renderDocuments(); break;
     case 'users': await renderUsers(); break;
+    case 'track': await renderTrackUsers(); break; // Tracking feature
+    case 'emails': await renderEmails(); break;
+    case 'broadcasts': await renderBroadcasts(); break;
     default: render('<div class="card"><h2>Page not found</h2></div>');
   }
 }
@@ -223,13 +257,44 @@ async function renderDashboard() {
   const meetings = getAllowedItems(await DB.meetings());
   const complaints = getAllowedItems(await DB.complaints());
   const minutes = getAllowedItems(await DB.minutes());
+  const broadcasts = getAllowedItems(await DB.broadcasts());
   const pending = complaints.filter(c => c.status === 'pending').length;
   const resolved = complaints.filter(c => c.status === 'resolved').length;
+  
+  const latestBroadcasts = broadcasts
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 3);
+  
   render(`
     <div class="page-header">
       <h2><i class="fas fa-chart-pie"></i> Dashboard</h2>
       <span>${getMunicipalityLabel(currentUser.municipality === 'all' ? 'all' : currentUser.municipality)}</span>
     </div>
+    
+    ${latestBroadcasts.length ? `
+      <div class="card" style="background:linear-gradient(135deg, var(--surface-alt), var(--surface));border:2px solid var(--primary-light);">
+        <div class="card-title" style="color:var(--primary-dark);">
+          <i class="fas fa-bullhorn"></i> Announcements
+        </div>
+        ${latestBroadcasts.map(b => `
+          <div style="padding:0.75rem;border-bottom:1px solid var(--border);last-child:border-bottom:none;">
+            <div style="display:flex;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <strong>${b.message}</strong>
+              <span style="color:var(--text-muted);font-size:0.85rem;">${formatDate(b.timestamp)}</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem;">
+              — ${b.sender}
+            </div>
+          </div>
+        `).join('')}
+        ${broadcasts.length > 3 ? `<div style="text-align:center;margin-top:0.5rem;">
+          <button class="btn btn-outline btn-sm" onclick="navigate('broadcasts')">
+            View All Announcements
+          </button>
+        </div>` : ''}
+      </div>
+    ` : ''}
+    
     <div class="grid-3">
       <div class="stat-card"><div class="num">${members.length}</div><div class="label">Board Members</div></div>
       <div class="stat-card"><div class="num">${meetings.length}</div><div class="label">Meetings</div></div>
@@ -245,6 +310,7 @@ async function renderDashboard() {
         <button class="btn btn-primary btn-sm" onclick="navigate('meetings')"><i class="fas fa-calendar-alt"></i> Meetings</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('complaints')"><i class="fas fa-exclamation-triangle"></i> Complaints</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('documents')"><i class="fas fa-folder-open"></i> Documents</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('emails')"><i class="fas fa-envelope"></i> Email</button>
       </div>
     </div>
     <div class="card">
@@ -264,7 +330,6 @@ async function renderDashboard() {
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
-  // Super Admin and Municipal Officers can add members
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
   render(`
     <div class="page-header">
@@ -293,7 +358,6 @@ async function renderMembers() {
 
 async function showAddMemberModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
-  // Only Super Admin can assign special roles
   let roleOptions = ['member'];
   if (currentUser.role === 'super_admin') {
     roleOptions = ['super_admin', 'municipal_officer', 'member'];
@@ -327,7 +391,6 @@ async function showAddMemberModal() {
         return;
     }
 
-    // Also add to members list if not super admin
     if (role !== 'super_admin') {
         const newMember = await DB.addMember({ name, email, role, municipality, joined: new Date().toISOString().slice(0, 10) });
         if (!newMember) {
@@ -357,6 +420,7 @@ async function deleteMember(id) {
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  
   render(`
     <div class="page-header">
       <h2><i class="fas fa-calendar-alt"></i> Meetings</h2>
@@ -371,10 +435,16 @@ async function renderMeetings() {
           </div>
           <div style="margin:0.65rem 0;color:var(--text-muted);font-size:0.95rem;"><i class="fas fa-calendar-day"></i> ${formatDate(meeting.date)} at ${meeting.time}</div>
           <div style="color:var(--text-muted);font-size:0.95rem;"><i class="fas fa-map-marker-alt"></i> ${meeting.location}</div>
-          <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;"><i class="fas fa-users"></i> ${meeting.attendees.length} attending</div>
-          <div class="actions" style="margin-top:0.85rem;">
+          
+          <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;">
+            <i class="fas fa-users"></i> ${meeting.attendees.length} attending | 
+            <i class="fas fa-user-times"></i> ${(meeting.declined || []).length} declined
+          </div>
+          
+          <div class="actions" style="margin-top:0.85rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
             <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})"><i class="fas fa-check"></i> Attend</button>
-            <button class="btn btn-warning btn-sm" onclick="declineAttendance(${meeting.id})"><i class="fas fa-times"></i> Decline</button>
+            <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})"><i class="fas fa-times"></i> Decline</button>
+            ${canAdd ? `<button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})"><i class="fas fa-list"></i> View Attendance</button>` : ''}
             ${canAdd ? `<button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})"><i class="fas fa-trash"></i></button>` : ''}
           </div>
         </div>
@@ -404,7 +474,7 @@ async function showScheduleMeetingModal() {
     const location = byId('mtLocation').value.trim();
     const municipality = byId('mtMunicipality').value;
     if (!title || !date || !time || !location) { toast('Complete all fields', 'danger'); return; }
-    const newMeeting = await DB.addMeeting({ title, date, time, location, municipality, status: 'scheduled', attendees: [] });
+    const newMeeting = await DB.addMeeting({ title, date, time, location, municipality, status: 'scheduled', attendees: [], declined: [] });
     if (newMeeting) {
         closeModal();
         toast('Meeting scheduled', 'success');
@@ -419,24 +489,127 @@ async function confirmAttendance(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
   if (!meeting) return;
+
   if (!meeting.attendees.includes(currentUser.email)) {
     meeting.attendees.push(currentUser.email);
-    await DB.setMeetings(meetings);
+  }
+  
+  // Remove from declined list if they were previously declined
+  if (meeting.declined && meeting.declined.some(d => d.email === currentUser.email)) {
+    meeting.declined = meeting.declined.filter(d => d.email !== currentUser.email);
+  }
+
+  const success = await DB._updateItem('meetings', id, meeting);
+  if (success) {
     toast('Attendance confirmed', 'success');
   } else {
-    toast('Already attending', 'info');
+    toast('Failed to confirm attendance', 'danger');
   }
-  navigate('meetings');
+  await renderMeetings();
 }
 
-async function declineAttendance(id) {
+async function showDeclineModal(id) {
+  showModal(`
+    <h3><i class="fas fa-times-circle"></i> Decline Meeting</h3>
+    <form id="declineMeetingForm">
+      <div class="form-group">
+        <label>Please provide a reason for not attending:</label>
+        <textarea id="declineReason" rows="4" required placeholder="E.g., Out of office, sick leave, scheduling conflict..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-warning btn-block"><i class="fas fa-paper-plane"></i> Submit Decline</button>
+    </form>
+  `);
+  
+  byId('declineMeetingForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const reason = byId('declineReason').value.trim();
+    if (!reason) { toast('Please enter a reason', 'danger'); return; }
+    
+    const meetings = await DB.meetings();
+    const meeting = meetings.find(item => item.id === id);
+    if (!meeting) return;
+
+    // Initialize declined array if it doesn't exist
+    if (!meeting.declined) meeting.declined = [];
+
+    // Remove from attendees if they were previously attending
+    meeting.attendees = meeting.attendees.filter(email => email !== currentUser.email);
+
+    // Check if they already declined, if so update reason, else add new record
+    const existingDecline = meeting.declined.find(d => d.email === currentUser.email);
+    if (existingDecline) {
+      existingDecline.reason = reason;
+    } else {
+      meeting.declined.push({
+        email: currentUser.email,
+        name: currentUser.name,
+        reason: reason,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const success = await DB._updateItem('meetings', id, meeting);
+    if (success) {
+      closeModal();
+      toast('Decline submitted successfully', 'success');
+      await renderMeetings();
+    } else {
+      toast('Failed to submit decline', 'danger');
+    }
+  });
+}
+
+async function viewAttendance(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
   if (!meeting) return;
-  meeting.attendees = meeting.attendees.filter(email => email !== currentUser.email);
-  await DB.setMeetings(meetings);
-  toast('Attendance declined', 'info');
-  navigate('meetings');
+
+  const attendees = meeting.attendees || [];
+  const declined = meeting.declined || [];
+  
+  // Fetch all users so we can show names instead of just emails for attendees
+  const users = await DB.users();
+  
+  const attendeeList = attendees.map(email => {
+    const user = users.find(u => u.email === email);
+    return `<li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
+      <i class="fas fa-check" style="color:var(--success);"></i> 
+      ${user ? user.name : email} 
+      <span style="color:var(--text-muted); font-size:0.85rem;">(${email})</span>
+    </li>`;
+  }).join('') || '<li style="padding:0.5rem 0; color:var(--text-muted);">No one has confirmed attendance yet.</li>';
+
+  const declinedList = declined.map(d => `
+    <li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+        <strong><i class="fas fa-times" style="color:var(--danger);"></i> ${d.name}</strong>
+        <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(d.timestamp)}</span>
+      </div>
+      <div style="color:var(--text-muted); font-size:0.85rem;">${d.email}</div>
+      <div style="margin-top:0.35rem; padding:0.5rem; background:var(--surface-muted); border-radius:8px; font-style:italic;">
+        "${d.reason}"
+      </div>
+    </li>
+  `).join('') || '<li style="padding:0.5rem 0; color:var(--text-muted);">No one has declined.</li>';
+
+  showModal(`
+    <h3><i class="fas fa-list"></i> Attendance: ${meeting.title}</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
+      <div class="card" style="background:var(--surface-alt);">
+        <div class="card-title" style="color:var(--success);">
+          <i class="fas fa-check-circle"></i> Attending (${attendees.length})
+        </div>
+        <ul style="list-style:none; padding:0; margin:0;">${attendeeList}</ul>
+      </div>
+      <div class="card" style="background:var(--surface-alt);">
+        <div class="card-title" style="color:var(--danger);">
+          <i class="fas fa-times-circle"></i> Declined (${declined.length})
+        </div>
+        <ul style="list-style:none; padding:0; margin:0;">${declinedList}</ul>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-block" style="margin-top:1rem;" onclick="closeModal()">Close</button>
+  `);
 }
 
 async function deleteMeeting(id) {
@@ -458,8 +631,7 @@ async function renderMinutes() {
       <h2><i class="fas fa-file-alt"></i> Meeting Minutes</h2>
       ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showUploadMinutesModal()"><i class="fas fa-upload"></i> Upload Minutes</button>' : ''}
     </div>
-    ${minutes.length ? minutes.map(item => `
-      <div class="card">
+    ${minutes.length ? minutes.map(item => `      <div class="card">
         <div class="flex-between" style="display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
           <strong>${item.uploadedBy}</strong>
           <span style="color:var(--text-muted);">${formatDate(item.uploadDate)}</span>
@@ -508,8 +680,7 @@ async function renderComplaints() {
       <h2><i class="fas fa-exclamation-triangle"></i> Complaints</h2>
       ${canManage ? '<button class="btn btn-primary btn-sm" onclick="showAddComplaintModal()"><i class="fas fa-plus"></i> Report Complaint</button>' : ''}
     </div>
-    ${complaints.length ? complaints.map(c => `
-      <div class="complaint-item">
+    ${complaints.length ? complaints.map(c => `      <div class="complaint-item">
         <div class="head">
           <strong>${c.title}</strong>
           <span class="badge ${c.status === 'pending' ? 'badge-danger' : c.status === 'resolved' ? 'badge-success' : 'badge-warning'}">${c.status}</span>
@@ -715,8 +886,64 @@ async function renderUsers() {
   `);
 }
 
+// ============= TRACK USERS MODULE =============
+async function renderTrackUsers() {
+  if (!isSystemAdmin(currentUser)) {
+    render('<div class="card"><h2>Access Denied</h2><p>Only the Super Admin can track users.</p></div>');
+    return;
+  }
+
+  const users = await DB.users();
+  const now = new Date();
+  
+  const userRows = users.map(user => {
+    let status = '<span class="badge badge-danger">Offline</span>';
+    let lastActive = 'Never';
+    
+    if (user.last_seen) {
+      const lastSeenDate = new Date(user.last_seen);
+      lastActive = formatDate(user.last_seen) + ' ' + lastSeenDate.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+      
+      // If seen in the last 3 minutes, they are Online
+      const diffMs = now - lastSeenDate;
+      const diffMins = Math.round(diffMs / 60000);
+      
+      if (diffMins < 3) {
+        status = '<span class="badge badge-success"><i class="fas fa-circle" style="font-size:0.6rem;"></i> Online</span>';
+      } else if (diffMins < 60) {
+        status = `<span class="badge badge-warning">Last seen ${diffMins}m ago</span>`;
+      }
+    }
+
+    return `
+      <tr>
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td>${getRoleLabel(user.role)}</td>
+        <td>${getMunicipalityLabel(user.municipality)}</td>
+        <td>${status}</td>
+        <td style="font-size:0.85rem; color:var(--text-muted);">${lastActive}</td>
+      </tr>
+    `;
+  }).join('');
+
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-map-marker-alt"></i> Track Users</h2>
+      <button class="btn btn-outline btn-sm" onclick="renderTrackUsers()"><i class="fas fa-sync"></i> Refresh</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Municipality</th><th>Status</th><th>Last Active</th></tr></thead>
+        <tbody>
+          ${userRows}
+        </tbody>
+      </table>
+    </div>
+  `);
+}
+
 async function showAddUserModal() {
-  // Only Super Admin sees this modal and can choose any role
   const roles = ['super_admin', 'municipal_officer', 'member'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
@@ -767,7 +994,6 @@ async function editUser(id) {
 }
 
 function showEditUserModal(user) {
-  // Only Super Admin can see this modal and choose any role
   const roles = ['super_admin', 'municipal_officer', 'member'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
@@ -785,14 +1011,13 @@ function showEditUserModal(user) {
   byId('editUserForm').addEventListener('submit', async function (event) {
     event.preventDefault();
     const name = byId('uName').value.trim();
-    const email = byId('uEmail').value.trim(); // Email is disabled, but we still send it for consistency
+    const email = byId('uEmail').value.trim();
     const password = byId('uPassword').value.trim();
     const role = byId('uRole').value;
     const municipality = byId('uMunicipality').value;
 
     if (!name) { toast('Name is required', 'danger'); return; }
     
-    // Prepare the update payload. Only include password if a new one was entered.
     const updateData = { name, email, role, municipality };
     if (password) {
         updateData.password = password;
@@ -805,7 +1030,6 @@ function showEditUserModal(user) {
 async function deleteUser(id) {
   const users = await DB.users();
   const target = users.find(user => user.id === id);
-  // Prevent deleting the last super_admin
   if (target && target.role === 'super_admin' && users.filter(user => user.role === 'super_admin').length <= 1) {
     toast('Cannot delete the last super admin', 'danger');
     return;
@@ -843,11 +1067,367 @@ async function updateUser(id, userData) {
   }
 }
 
+// ============= EMAIL MODULE =============
+async function renderEmails() {
+  const emails = getAllowedItems(await DB.emails());
+  emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-envelope"></i> Email</h2>
+      <button class="btn btn-primary btn-sm" onclick="showComposeEmailModal()">
+        <i class="fas fa-plus"></i> Compose
+      </button>
+    </div>
+    
+    <div class="email-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-outline active" onclick="filterEmails('inbox', event)">
+        <i class="fas fa-inbox"></i> Inbox
+      </button>
+      <button class="btn btn-sm btn-outline" onclick="filterEmails('sent', event)">
+        <i class="fas fa-paper-plane"></i> Sent
+      </button>
+      <button class="btn btn-sm btn-outline" onclick="filterEmails('unread', event)">
+        <i class="fas fa-circle" style="color:#2e7d32;font-size:0.6rem;"></i> Unread
+      </button>
+    </div>
+    
+    <div id="emailList">
+      ${await filterAndRenderEmails('inbox')}
+    </div>
+  `);
+}
+
+async function filterAndRenderEmails(filter) {
+  const allEmails = getAllowedItems(await DB.emails(), 'municipality');
+  let filtered = [];
+  
+  switch(filter) {
+    case 'inbox':
+      filtered = allEmails.filter(e => e.to === currentUser.email || e.to === 'all');
+      break;
+    case 'sent':
+      filtered = allEmails.filter(e => e.from === currentUser.email);
+      break;
+    case 'unread':
+      filtered = allEmails.filter(e => !e.read && (e.to === currentUser.email || e.to === 'all'));
+      break;
+    default:
+      filtered = allEmails;
+  }
+  
+  filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  const emailList = byId('emailList');
+  if (!emailList) return '';
+  
+  emailList.innerHTML = filtered.length ? filtered.map(email => `
+    <div class="email-item" style="
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:1rem;
+      margin-bottom:0.75rem;
+      background:var(--surface);
+      cursor:pointer;
+      ${!email.read ? 'border-left:4px solid var(--primary);' : ''}
+      transition:background var(--transition);
+    " onclick="viewEmail(${email.id})">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+          ${!email.read ? '<span style="color:var(--primary);font-size:0.6rem;"><i class="fas fa-circle"></i></span>' : ''}
+          <strong>${email.subject}</strong>
+        </div>
+        <span style="color:var(--text-muted);font-size:0.85rem;">
+          ${formatDate(email.timestamp)}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-top:0.35rem;">
+        <span style="color:var(--text-muted);font-size:0.9rem;">From: ${email.from}</span>
+        <span class="badge badge-info">${getMunicipalityLabel(email.municipality)}</span>
+      </div>
+    </div>
+  `).join('') : '<div class="card text-center text-muted">No emails found.</div>';
+}
+
+async function viewEmail(id) {
+  const emails = await DB.emails();
+  const email = emails.find(e => e.id === id);
+  if (!email) return;
+  
+  // Update read status in the database
+  if (!email.read) {
+      email.read = true;
+      const success = await DB._updateItem('emails', id, email);
+      if (!success) {
+          toast('Failed to mark as read', 'danger');
+      }
+  }
+  
+  showModal(`
+    <h3><i class="fas fa-envelope-open"></i> ${email.subject}</h3>
+    <div style="margin:1rem 0;padding:0.75rem;background:var(--surface-muted);border-radius:12px;">
+      <div><strong>From:</strong> ${email.from}</div>
+      <div><strong>To:</strong> ${email.to}</div>
+      <div><strong>Date:</strong> ${formatDate(email.timestamp)}</div>
+      <div><strong>Municipality:</strong> ${getMunicipalityLabel(email.municipality)}</div>
+    </div>
+    <div style="margin:1rem 0;padding:1rem;border:1px solid var(--border);border-radius:12px;white-space:pre-wrap;">
+      ${email.body}
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <button class="btn btn-danger btn-sm" onclick="deleteEmail(${email.id})">
+        <i class="fas fa-trash"></i> Delete
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal();renderEmails();">
+        <i class="fas fa-arrow-left"></i> Back
+      </button>
+    </div>
+  `);
+}
+
+async function deleteEmail(id) {
+  if (!confirm('Delete this email?')) return;
+  const success = await DB._deleteItem('emails', id);
+  if (success) {
+      toast('Email deleted', 'success');
+      closeModal();
+      await renderEmails();
+  } else {
+      toast('Failed to delete email', 'danger');
+  }
+}
+
+async function showComposeEmailModal() {
+  const users = await DB.users();
+  const recipients = users.filter(u => u.email !== currentUser.email);
+  
+  showModal(`
+    <h3><i class="fas fa-pencil-alt"></i> Compose Email</h3>
+    <form id="composeEmailForm">
+      <div class="form-group">
+        <label>To</label>
+        <select id="emailTo" required>
+          <option value="">Select recipient...</option>
+          ${recipients.map(u => `<option value="${u.email}">${u.name} (${u.email})</option>`).join('')}
+          <option value="all">All Users</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <input type="text" id="emailSubject" required placeholder="Enter subject..." />
+      </div>
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="emailBody" rows="6" required placeholder="Write your message..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">
+        <i class="fas fa-paper-plane"></i> Send
+      </button>
+    </form>
+  `);
+  
+  byId('composeEmailForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const to = byId('emailTo').value;
+    const subject = byId('emailSubject').value.trim();
+    const body = byId('emailBody').value.trim();
+    
+    if (!to || !subject || !body) {
+      toast('Please complete all fields', 'danger');
+      return;
+    }
+    
+    // Logic for sending to 'all'
+    if (to === 'all') {
+        const users = await DB.users();
+        for (const user of users) {
+            if (user.email !== currentUser.email) {
+                await DB.addEmail({
+                    from: currentUser.email,
+                    to: user.email,
+                    subject: subject,
+                    body: body,
+                    timestamp: new Date().toISOString(),
+                    read: false,
+                    municipality: currentUser.municipality === 'all' ? 'all' : currentUser.municipality
+                });
+            }
+        }
+    } else {
+        // Send to a single recipient
+        await DB.addEmail({
+            from: currentUser.email,
+            to: to,
+            subject: subject,
+            body: body,
+            timestamp: new Date().toISOString(),
+            read: false,
+            municipality: currentUser.municipality === 'all' ? 'all' : currentUser.municipality
+        });
+    }
+    
+    closeModal();
+    toast('Email sent successfully', 'success');
+    await renderEmails();
+  });
+}
+
+async function filterEmails(filter, event) {
+  if (event && event.target) {
+    document.querySelectorAll('.email-tabs .btn').forEach(btn => btn.classList.remove('active'));
+    event.target.closest('.btn').classList.add('active');
+  }
+  
+  await filterAndRenderEmails(filter);
+}
+
+// ============= BROADCAST MODULE =============
+async function renderBroadcasts() {
+  const broadcasts = getAllowedItems(await DB.broadcasts());
+  broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer';
+  
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-bullhorn"></i> Announcements</h2>
+      ${isAdmin ? `
+        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
+          <i class="fas fa-plus"></i> New Broadcast
+        </button>
+      ` : ''}
+    </div>
+    
+    ${isAdmin ? `
+      <div class="card" style="background:var(--surface-alt);border:2px dashed var(--border);">
+        <div class="card-title"><i class="fas fa-bullhorn"></i> Admin Broadcast</div>
+        <p style="color:var(--text-muted);margin-bottom:1rem;">
+          Send a message that will be visible to all users on their dashboard.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
+          <i class="fas fa-bullhorn"></i> Create Broadcast
+        </button>
+      </div>
+    ` : ''}
+    
+    <div class="broadcast-list">
+      ${broadcasts.length ? broadcasts.map(b => `
+        <div class="broadcast-item card" style="
+          border-left:4px solid var(--primary);
+          ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? 'background:var(--surface-alt);' : ''}
+        ">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <strong style="color:var(--primary-dark);">
+              <i class="fas fa-bullhorn"></i> ${b.sender}
+            </strong>
+            <span style="color:var(--text-muted);font-size:0.85rem;">
+              ${formatDate(b.timestamp)}
+            </span>
+          </div>
+          <div style="margin-top:0.75rem;font-size:1.05rem;padding:0.5rem 0;">
+            ${b.message}
+          </div>
+          <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.85rem;">
+            ${getMunicipalityLabel(b.municipality)}
+            ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? ' • <span style="color:var(--primary);font-weight:600;">New</span>' : ''}
+          </div>
+          ${isAdmin ? `
+            <div style="margin-top:0.75rem;">
+              <button class="btn btn-danger btn-sm" onclick="deleteBroadcast(${b.id})">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `).join('') : '<div class="card text-center text-muted">No announcements available.</div>'}
+    </div>
+  `);
+}
+
+async function showBroadcastModal() {
+  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  
+  showModal(`
+    <h3><i class="fas fa-bullhorn"></i> Create Broadcast</h3>
+    <form id="broadcastForm">
+      <div class="form-group">
+        <label>Message</label>
+        <textarea id="broadcastMessage" rows="5" required 
+          placeholder="Type your announcement here. This will be visible to all users in the selected municipality..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Municipality</label>
+        <select id="broadcastMunicipality">
+            ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">
+        <i class="fas fa-bullhorn"></i> Create Broadcast
+      </button>
+    </form>
+  `);
+  
+  byId('broadcastForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const message = byId('broadcastMessage').value.trim();
+    const municipality = byId('broadcastMunicipality').value;
+    
+    if (!message) { toast('Please enter a message', 'danger'); return; }
+    
+    const newBroadcast = await DB.addBroadcast({
+        message: message,
+        sender: currentUser.name,
+        timestamp: new Date().toISOString(),
+        municipality: municipality
+    });
+    
+    if (newBroadcast) {
+        closeModal();
+        toast('Broadcast created successfully', 'success');
+        await renderBroadcasts();
+    } else {
+        toast('Failed to create broadcast', 'danger');
+    }
+  });
+}
+
+async function deleteBroadcast(id) {
+  if (!confirm('Delete this broadcast?')) return;
+  const success = await DB._deleteItem('broadcasts', id);
+  if (success) {
+      toast('Broadcast deleted', 'success');
+      await renderBroadcasts();
+  } else {
+      toast('Failed to delete broadcast', 'danger');
+  }
+}
+
+// ============= SHARED FUNCTIONS =============
 function showModal(content) {
+  let overlay = byId('modalOverlay');
+  // If the overlay doesn't exist on the page (e.g. login page), create it dynamically
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box" id="modalBox">
+        <button class="close-modal" id="modalClose">&times;</button>
+        <div id="modalBody"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    // Attach listeners for the dynamically created modal
+    byId('modalClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', event => {
+      if (event.target === event.currentTarget) closeModal();
+    });
+  }
+  
   const body = byId('modalBody');
   if (body) body.innerHTML = content;
-  const overlay = byId('modalOverlay');
-  if (overlay) overlay.classList.add('active');
+  overlay.classList.add('active');
 }
 
 function closeModal() {
@@ -982,13 +1562,12 @@ async function boot() {
       });
     }
     
-    // --- Add a simple "Register" link for members ---
     const formContainer = byId('loginForm')?.parentElement;
     if (formContainer) {
         const regLink = document.createElement('p');
-        regLink.innerHTML = '<a href="#" id="showRegisterLink">Not a member? Create an account</a>';
+        regLink.innerHTML = '<a href="#" id="showRegisterLink" style="color:var(--primary); font-weight:500;">Not a member? Create an account</a>';
         regLink.style.textAlign = 'center';
-        regLink.style.marginTop = '1rem';
+        regLink.style.marginTop = '1.5rem';
         formContainer.appendChild(regLink);
         
         byId('showRegisterLink').addEventListener('click', function(e) {
@@ -1017,6 +1596,21 @@ async function boot() {
       if (event.key === 'Escape') closeModal();
       if (event.ctrlKey && event.key.toLowerCase() === 'l') { event.preventDefault(); logout(); }
     });
+    
+    // --- HEARTBEAT TIMER ---
+    // Tell the backend this user is still active every 60 seconds
+    setInterval(async () => {
+      if (currentUser && currentUser.id) {
+        try {
+          await fetch(`${API_BASE_URL}/heartbeat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: currentUser.id })
+          });
+        } catch (e) { console.error('Heartbeat failed'); }
+      }
+    }, 60000); // 60,000 ms = 1 minute
+
     navigate('dashboard');
   }
   if (page === 'settings') {
@@ -1027,19 +1621,46 @@ async function boot() {
   }
 }
 
+// ============= REGISTRATION & OAUTH MODULE =============
 function showRegisterModal() {
-    closeModal(); // Close login if open
+    closeModal();
     showModal(`
-    <h3><i class="fas fa-user-plus"></i> Member Registration</h3>
+    <h3><i class="fas fa-user-plus"></i> Create Account</h3>
+    
+    <div style="margin-bottom: 1.5rem;">
+        <button class="btn btn-outline btn-block" style="margin-bottom:0.5rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;" onclick="loginWithGoogle()">
+            <i class="fab fa-google" style="color:#db4a39;"></i> Continue with Google
+        </button>
+        <button class="btn btn-outline btn-block" style="display:flex; align-items:center; justify-content:center; gap:0.5rem;" onclick="loginWithMicrosoft()">
+            <i class="fab fa-microsoft" style="color:#00a4ef;"></i> Continue with Microsoft
+        </button>
+        <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin: 1rem 0; position:relative;">
+            <span style="background:var(--surface); padding:0 10px; position:relative; z-index:1;">OR</span>
+            <span style="position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border); z-index:0;"></span>
+        </p>
+    </div>
+
     <form id="registerForm">
       <div class="form-group"><label>Full Name</label><input type="text" id="rName" required /></div>
       <div class="form-group"><label>Email</label><input type="email" id="rEmail" required /></div>
-      <div class="form-group"><label>Password</label><input type="password" id="rPassword" required /></div>
       <div class="form-group"><label>Municipality</label><select id="rMunicipality">
           <option value="kenol">Kenol</option>
           <option value="kangare">Kangare</option>
           <option value="muranga_town">Murang'a Town</option>
       </select></div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="rPassword" required oninput="checkPasswordStrength()" style="border-radius: 14px; border: 1px solid var(--border);" />
+        <div id="passwordFeedback" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; padding: 0.75rem; background: var(--surface-alt); border-radius: 8px; line-height: 1.4;">
+          <strong style="display:block; margin-bottom:0.25rem;">Password Requirements:</strong>
+          • At least 8 characters<br>
+          • At least 1 uppercase letter (A-Z)<br>
+          • At least 1 lowercase letter (a-z)<br>
+          • At least 1 number (0-9)<br>
+          • At least 1 special character (!@#$%^&*)
+        </div>
+      </div>
+      <div class="form-group"><label>Confirm Password</label><input type="password" id="rConfirmPassword" required oninput="checkPasswordMatch()" style="border-radius: 14px; border: 1px solid var(--border);" /></div>
       <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Register</button>
     </form>
     `);
@@ -1049,18 +1670,106 @@ function showRegisterModal() {
         const name = byId('rName').value.trim();
         const email = byId('rEmail').value.trim();
         const password = byId('rPassword').value.trim();
+        const confirmPassword = byId('rConfirmPassword').value.trim();
         const municipality = byId('rMunicipality').value;
+        
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+        if (!passwordRegex.test(password)) {
+            toast('Password does not meet security requirements', 'danger');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            toast('Passwords do not match', 'danger');
+            return;
+        }
         
         try {
             const newUser = await DB.registerUser({ name, email, password, municipality });
             closeModal();
             toast('Registration successful! Please login.', 'success');
-            // Optional: auto-login the user
-            // currentUser = newUser;
-            // localStorage.setItem('mbp_session', JSON.stringify({ userId: newUser.id }));
-            // window.location.href = 'home.html';
         } catch (error) {
             toast(error.message, 'danger');
+        }
+    });
+}
+
+function checkPasswordStrength() {
+    const passwordInput = byId('rPassword');
+    if (!passwordInput) return;
+    const password = passwordInput.value;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    
+    if (password.length === 0) {
+        passwordInput.style.border = '1px solid var(--border)';
+    } else if (passwordRegex.test(password)) {
+        passwordInput.style.border = '2px solid var(--success, #28a745)';
+    } else {
+        passwordInput.style.border = '2px solid var(--danger, #dc3545)';
+    }
+    
+    // Also check match if confirm has value
+    if (byId('rConfirmPassword')?.value.length > 0) {
+        checkPasswordMatch();
+    }
+}
+
+function checkPasswordMatch() {
+    const passwordInput = byId('rPassword');
+    const confirmInput = byId('rConfirmPassword');
+    if (!passwordInput || !confirmInput) return;
+    
+    if (confirmInput.value.length === 0) {
+        confirmInput.style.border = '1px solid var(--border)';
+    } else if (passwordInput.value === confirmInput.value) {
+        confirmInput.style.border = '2px solid var(--success, #28a745)';
+    } else {
+        confirmInput.style.border = '2px solid var(--danger, #dc3545)';
+    }
+}
+
+async function loginWithGoogle() {
+    loginWithOAuth('Google', 'google');
+}
+
+async function loginWithMicrosoft() {
+    loginWithOAuth('Microsoft', 'microsoft');
+}
+
+async function loginWithOAuth(providerName, providerId) {
+    closeModal();
+    showModal(`
+        <h3><i class="fab fa-${providerId}"></i> Continue with ${providerName}</h3>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1rem;">
+            This is a simulated ${providerName} login for local development. Enter your name and email to continue.
+        </p>
+        <form id="oauthForm">
+            <div class="form-group"><label>Name</label><input type="text" id="oName" required /></div>
+            <div class="form-group"><label>Email</label><input type="email" id="oEmail" required /></div>
+            <button type="submit" class="btn btn-primary btn-block">Continue</button>
+        </form>
+    `);
+    
+    byId('oauthForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = byId('oName').value.trim();
+        const email = byId('oEmail').value.trim();
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/oauth-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, provider: providerName })
+            });
+            if (response.ok) {
+                currentUser = await response.json();
+                localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
+                window.location.href = 'home.html';
+            } else {
+                toast(`${providerName} login failed`, 'danger');
+            }
+        } catch (err) {
+            toast('An error occurred', 'danger');
         }
     });
 }
@@ -1070,7 +1779,8 @@ window.showAddMemberModal = showAddMemberModal;
 window.deleteMember = deleteMember;
 window.showScheduleMeetingModal = showScheduleMeetingModal;
 window.confirmAttendance = confirmAttendance;
-window.declineAttendance = declineAttendance;
+window.showDeclineModal = showDeclineModal;
+window.viewAttendance = viewAttendance;
 window.deleteMeeting = deleteMeeting;
 window.showUploadMinutesModal = showUploadMinutesModal;
 window.showAddComplaintModal = showAddComplaintModal;
@@ -1090,4 +1800,17 @@ window.closeModal = closeModal;
 window.toast = toast;
 window.editUser = editUser;
 window.updateUser = updateUser;
+window.renderEmails = renderEmails;
+window.viewEmail = viewEmail;
+window.deleteEmail = deleteEmail;
+window.showComposeEmailModal = showComposeEmailModal;
+window.filterEmails = filterEmails;
+window.renderBroadcasts = renderBroadcasts;
+window.showBroadcastModal = showBroadcastModal;
+window.deleteBroadcast = deleteBroadcast;
+window.renderTrackUsers = renderTrackUsers;
+window.loginWithGoogle = loginWithGoogle;
+window.loginWithMicrosoft = loginWithMicrosoft;
+window.checkPasswordStrength = checkPasswordStrength;
+window.checkPasswordMatch = checkPasswordMatch;
 window.addEventListener('DOMContentLoaded', boot);

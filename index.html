@@ -43,16 +43,20 @@
         <div id="loginError" class="alert alert-danger" style="display:none;">Invalid credentials. Please try again.</div>
         <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Login</button>
       </form>
-      <div style="margin-top:1rem;font-size:0.8rem;color:var(--gray-500);text-align:center;">
-        <p><strong>Demo Credentials:</strong><br />
-        admin@muranga.go.ke / admin123 (System Admin)<br />
-        kenol@muranga.go.ke / admin123 (Kenol Admin)<br />
-        kangare@muranga.go.ke / admin123 (Kangare Admin)<br />
-        muranga@muranga.go.ke / admin123 (Murang'a Town Admin)</p>
-      </div>
     </div>
   </div>
 
   <script src="app_backend.js"></script>
+  <!-- Fine Print Footer for Login Page -->
+
+<footer style="text-align: center; padding: 1.5rem; font-size: 0.75rem; color: #666; margin-top: 2rem;">
+  <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
+  <p>Unauthorized access or use of this system is strictly prohibited. By logging in, you agree to the <a href="#" style="color: inherit; text-decoration: underline;">Terms of Service</a> and <a href="#" style="color: inherit; text-decoration: underline;">Privacy Policy</a>.</p>
+</footer>
+
+<script>
+  // Automatically update the year
+  document.getElementById('currentYear').textContent = new Date().getFullYear();
+</script>
 </body>
 </html>
