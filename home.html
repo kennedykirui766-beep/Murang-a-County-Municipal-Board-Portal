@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Murang'a County Municipal Board Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="home">
+  <div class="accessibility-bar" id="accessibilityBar">
+    <span class="label"><i class="fas fa-universal-access"></i> Accessibility</span>
+    <button id="aTextSmall" title="Small text"><i class="fas fa-font"></i> A-</button>
+    <button id="aTextDefault" title="Default text"><i class="fas fa-font"></i> A</button>
+    <button id="aTextLarge" title="Large text"><i class="fas fa-font"></i> A+</button>
+    <button id="aTextXlarge" title="Extra large text"><i class="fas fa-font"></i> A++</button>
+    <button id="aSpacingCompact" title="Compact spacing"><i class="fas fa-compress-arrows-alt"></i> ↕</button>
+    <button id="aSpacingRelaxed" title="Relaxed spacing"><i class="fas fa-expand-arrows-alt"></i> ↕</button>
+    <button id="aSpeech" title="Text to Speech"><i class="fas fa-microphone"></i> Speak</button>
+    <button id="aThemeToggle" title="Toggle dark/light mode"><i class="fas fa-moon"></i> Theme</button>
+    <button id="aReset" title="Reset accessibility"><i class="fas fa-undo"></i> Reset</button>
+  </div>
+
+  <div class="speech-indicator" id="speechIndicator">
+    <i class="fas fa-volume-up"></i> Speaking...
+    <button id="speechStop" style="background:none;border:none;color:white;cursor:pointer;font-size:1.2rem;">✕</button>
+  </div>
+
+  <div id="app" class="active">
+    <nav class="navbar">
+      <div class="brand"><i class="fas fa-landmark"></i> Murang'a Board Portal</div>
+      <div class="nav-actions">
+        <span class="user-badge"><i class="fas fa-user-circle"></i> <span id="navUserName">User</span> (<span id="navUserRole">role</span>)</span>
+        <span class="user-badge" style="background:var(--gray-200);color:var(--gray-700);" id="navMunicipality">Municipality</span>
+        <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </nav>
+
+    <div class="app-body">
+      <aside class="sidebar" id="sidebar">
+        <div class="nav-section">Main</div>
+        <div class="nav-item active" data-page="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</div>
+        <div class="nav-item" data-page="members"><i class="fas fa-users"></i> Members</div>
+        <div class="nav-item" data-page="meetings"><i class="fas fa-calendar-alt"></i> Meetings</div>
+        <div class="nav-item" data-page="minutes"><i class="fas fa-file-alt"></i> Minutes</div>
+        <div class="nav-item" data-page="complaints"><i class="fas fa-exclamation-triangle"></i> Complaints</div>
+        <div class="nav-item" data-page="documents"><i class="fas fa-folder-open"></i> Documents</div>
+        <div class="nav-section">System</div>
+        <div class="nav-item" data-page="users" id="navUsers"><i class="fas fa-user-cog"></i> Manage Users</div>
+        <a class="nav-item" href="settings.html"><i class="fas fa-cog"></i> Settings</a>
+      </aside>
+
+      <main class="main-content" id="mainContent">
+        <div id="pageContainer"></div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box" id="modalBox">
+      <button class="close-modal" id="modalClose">&times;</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="app_backend.js"></script>
+</body>
+</html>

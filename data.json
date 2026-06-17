@@ -1,0 +1,182 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "System Admin",
+      "email": "admin@muranga.go.ke",
+      "password": "admin123",
+      "role": "system_admin",
+      "municipality": "all"
+    },
+    {
+      "id": 2,
+      "name": "Kenol Admin",
+      "email": "kenol@muranga.go.ke",
+      "password": "admin123",
+      "role": "municipal_admin",
+      "municipality": "kenol"
+    },
+    {
+      "id": 3,
+      "name": "Kangare Admin",
+      "email": "kangare@kangare.go.ke",
+      "password": "admin123",
+      "role": "municipal_admin",
+      "municipality": "kangare"
+    },
+    {
+      "id": 4,
+      "name": "Murang'a Town Admin",
+      "email": "muranga@muranga.go.ke",
+      "password": "admin123",
+      "role": "municipal_admin",
+      "municipality": "muranga_town"
+    },
+    {
+      "id": 5,
+      "name": "John Board Member",
+      "email": "john@kenol.go.ke",
+      "password": "member123",
+      "role": "board_member",
+      "municipality": "kenol"
+    },
+    {
+      "id": 6,
+      "name": "Mary Board Member",
+      "email": "mary@kangare.go.ke",
+      "password": "member123",
+      "role": "board_member",
+      "municipality": "kangare"
+    },
+    {
+      "id": 7,
+      "name": "Peter Board Member",
+      "email": "peter@muranga.go.ke",
+      "password": "member123",
+      "role": "board_member",
+      "municipality": "muranga_town"
+    },
+    {
+      "id": 8,
+      "name": "Dept Officer Kenol",
+      "email": "officer@kenol.go.ke",
+      "password": "officer123",
+      "role": "department_officer",
+      "municipality": "kenol"
+    },
+    {
+      "id": 9,
+      "name": "Social Officer",
+      "email": "social@muranga.go.ke",
+      "password": "social123",
+      "role": "social_officer",
+      "municipality": "all"
+    }
+  ],
+  "members": [
+    {
+      "id": 1,
+      "name": "John Board Member",
+      "email": "john@kenol.go.ke",
+      "role": "board_member",
+      "municipality": "kenol",
+      "joined": "2026-06-17"
+    },
+    {
+      "id": 2,
+      "name": "Mary Board Member",
+      "email": "mary@kangare.go.ke",
+      "role": "board_member",
+      "municipality": "kangare",
+      "joined": "2026-06-17"
+    },
+    {
+      "id": 3,
+      "name": "Peter Board Member",
+      "email": "peter@muranga.go.ke",
+      "role": "board_member",
+      "municipality": "muranga_town",
+      "joined": "2026-06-17"
+    },
+    {
+      "id": 4,
+      "name": "Dept Officer Kenol",
+      "email": "officer@kenol.go.ke",
+      "role": "department_officer",
+      "municipality": "kenol",
+      "joined": "2026-06-17"
+    }
+  ],
+  "meetings": [
+    {
+      "id": 1,
+      "title": "Kenol Budget Meeting",
+      "date": "2026-06-20",
+      "time": "10:00",
+      "location": "Kenol Hall",
+      "municipality": "kenol",
+      "status": "scheduled",
+      "attendees": []
+    },
+    {
+      "id": 2,
+      "title": "Kangare Development Forum",
+      "date": "2026-06-22",
+      "time": "14:00",
+      "location": "Kangare Centre",
+      "municipality": "kangare",
+      "status": "scheduled",
+      "attendees": []
+    },
+    {
+      "id": 3,
+      "title": "Murang'a Town Council",
+      "date": "2026-06-25",
+      "time": "09:30",
+      "location": "Town Hall",
+      "municipality": "muranga_town",
+      "status": "scheduled",
+      "attendees": []
+    }
+  ],
+  "complaints": [
+    {
+      "id": 1,
+      "title": "Road damage in Kenol",
+      "description": "Potholes on main road near Kenol market.",
+      "municipality": "kenol",
+      "status": "pending",
+      "assignedTo": "",
+      "date": "2026-06-17"
+    },
+    {
+      "id": 2,
+      "title": "Water shortage Kangare",
+      "description": "Irregular water supply in Kangare estate.",
+      "municipality": "kangare",
+      "status": "in_progress",
+      "assignedTo": "Dept Officer Kenol",
+      "date": "2026-06-17"
+    },
+    {
+      "id": 3,
+      "title": "Street lighting Murang'a Town",
+      "description": "Several street lights are not working.",
+      "municipality": "muranga_town",
+      "status": "resolved",
+      "assignedTo": "Social Officer",
+      "date": "2026-06-17"
+    }
+  ],
+  "minutes": [
+    {
+      "id": 1,
+      "meetingId": 1,
+      "content": "Kenol budget approved and upcoming maintenance projects were discussed.",
+      "uploadedBy": "Kenol Admin",
+      "municipality": "kenol",
+      "uploadDate": "2026-06-17"
+    }
+  ],
+  "documents": []
+}
