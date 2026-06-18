@@ -1,5 +1,3 @@
-
-
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
 const DB = {
@@ -251,7 +249,7 @@ async function navigate(page) {
   }
 }
 
-// ============= LOGIN & REGISTER VIEWS =============
+//LOGIN & REGISTER VIEWS
 
 async function renderLogin() {
   const container = byId('app') || document.body;
@@ -290,6 +288,12 @@ async function renderLogin() {
           Don't have an account? 
           <a href="#" onclick="renderRegister()" style="color: var(--primary); font-weight: 600;">Create Account</a>
         </div>
+
+        <!-- FINE PRINT ADDED HERE -->
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 1.5rem; padding: 0 1rem;">
+          By accessing this system, you agree to our <a href="#" style="color: var(--primary); font-weight: 600;">Terms of Service</a> and <a href="#" style="color: var(--primary); font-weight: 600;">Privacy Policy</a>.
+        </div>
+
       </div>
     </div>
   `;
@@ -367,6 +371,12 @@ async function renderRegister() {
           Already have an account? 
           <a href="#" onclick="renderLogin()" style="color: var(--primary); font-weight: 600;">Login</a>
         </div>
+
+        <!-- FINE PRINT ADDED HERE -->
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 1.5rem; padding: 0 1rem;">
+          By clicking "Create Account", you agree to our <a href="#" style="color: var(--primary); font-weight: 600;">Terms of Service</a> and <a href="#" style="color: var(--primary); font-weight: 600;">Privacy Policy</a>.
+        </div>
+
       </div>
     </div>
   `;
@@ -399,7 +409,7 @@ async function renderRegister() {
   });
 }
 
-//  DASHBOARD 
+//DASHBOARD
 
 async function renderDashboard() {
   const members = getAllowedItems(await DB.members());
@@ -477,7 +487,7 @@ async function renderDashboard() {
   `);
 }
 
-// MEMBERS 
+//MEMBERS
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
@@ -568,7 +578,7 @@ async function deleteMember(id) {
   }
 }
 
-// MEETINGS (Updated with Features & Styles)
+// ============= MEETINGS (Updated with Features & Styles) =============
 
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
@@ -853,7 +863,7 @@ async function deleteMeeting(id) {
   }
 }
 
-// ============= MINUTES =============
+// MINUTES
 
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
@@ -903,7 +913,7 @@ async function showUploadMinutesModal() {
   });
 }
 
-// ============= COMPLAINTS =============
+//COMPLAINTS
 
 async function renderComplaints() {
   const complaints = getAllowedItems(await DB.complaints());
@@ -1003,7 +1013,7 @@ async function deleteComplaint(id) {
   }
 }
 
-// ============= DOCUMENTS =============
+//DOCUMENTS
 
 async function renderDocuments() {
   const documents = getAllowedItems(await DB.documents());
@@ -1089,7 +1099,7 @@ async function deleteDoc(id) {
   }
 }
 
-// ============= USERS =============
+//USERS
 
 async function renderUsers() {
   if (!isSystemAdmin(currentUser)) {
@@ -1141,6 +1151,7 @@ async function renderTrackUsers() {
       const lastSeenDate = new Date(user.last_seen);
       lastActive = formatDate(user.last_seen) + ' ' + lastSeenDate.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
       
+      // If seen in the last 3 minutes, they are Online
       const diffMs = now - lastSeenDate;
       const diffMins = Math.round(diffMs / 60000);
       
@@ -1393,7 +1404,7 @@ async function viewEmail(id) {
     <div style="margin:1rem 0;padding:0.75rem;background:var(--surface-muted);border-radius:12px;">
       <div><strong>From:</strong> ${email.from}</div>
       <div><strong>To:</strong> ${email.to}</div>
-      <div><strong>Date:</strong> ${formatDateTime(email.timestamp)}</div>
+      <div><strong>Date:</strong> ${formatDate(email.timestamp)}</div>
     </div>
     <div style="line-height:1.6;white-space:pre-wrap;">${email.body}</div>
     <div style="margin-top:2rem;text-align:right;">
@@ -1462,7 +1473,7 @@ async function renderBroadcasts() {
         <div class="card broadcast-item">
           <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
             <strong style="font-size:1.1rem;">${b.message}</strong>
-            <span style="color:var(--text-muted);font-size:0.85rem;">${formatDateTime(b.timestamp)}</span>
+            <span style="color:var(--text-muted);font-size:0.85rem;">${formatDate(b.timestamp)}</span>
           </div>
           <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">
             From: <strong>${b.sender}</strong> • To: ${getMunicipalityLabel(b.municipality)}
@@ -1513,7 +1524,7 @@ async function showBroadcastModal() {
   });
 }
 
-// ============= HELPER UI FUNCTIONS =============
+//HELPER UI FUNCTIONS
 
 function showModal(content) {
     let overlay = byId('modalOverlay');
