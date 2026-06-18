@@ -45,13 +45,15 @@ class Member(db.Model):
 class Meeting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200))
+    description = db.Column(db.Text, default='')
     date = db.Column(db.String(20))
     time = db.Column(db.String(20))
     location = db.Column(db.String(200))
     municipality = db.Column(db.String(50))
     status = db.Column(db.String(50))
-    attendees = db.Column(db.Text, default='[]')  # Stored as JSON string
-    declined = db.Column(db.Text, default='[]')   # Stored as JSON string with reason
+    attendees = db.Column(db.Text, default='[]')
+    declined = db.Column(db.Text, default='[]')
+    files = db.Column(db.Text, default='[]')
     
     def to_dict(self):
         d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -63,6 +65,10 @@ class Meeting(db.Model):
             d['declined'] = json.loads(d['declined']) if d['declined'] else []
         except:
             d['declined'] = []
+        try:
+            d['files'] = json.loads(d['files']) if d['files'] else []
+        except:
+            d['files'] = []
         return d
 
 
@@ -74,7 +80,7 @@ class Complaint(db.Model):
     municipality = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False)
     assignedTo = db.Column(db.String(100), default='')
-    date = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
+    date = db.Column(db.String, nullable=False)
 
     def to_dict(self):
         return {
@@ -91,21 +97,22 @@ class Complaint(db.Model):
 class Minute(db.Model):
     __tablename__ = 'minutes'
     id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), default='')  # NEW: Title of minutes
+    summary = db.Column(db.Text, default='')       # NEW: Summary of minutes
     meetingId = db.Column(db.Integer, nullable=True)
     content = db.Column(db.Text, nullable=False)
     uploadedBy = db.Column(db.String(100), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    uploadDate = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
+    uploadDate = db.Column(db.String, nullable=False)
+    files = db.Column(db.Text, default='[]')      # NEW: Store file data as JSON
 
     def to_dict(self):
-        return {
-            'id': self.id,
-            'meetingId': self.meetingId,
-            'content': self.content,
-            'uploadedBy': self.uploadedBy,
-            'municipality': self.municipality,
-            'uploadDate': self.uploadDate
-        }
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        try:
+            d['files'] = json.loads(d['files']) if d['files'] else []
+        except:
+            d['files'] = []
+        return d
 
 
 class Document(db.Model):
@@ -115,7 +122,7 @@ class Document(db.Model):
     type = db.Column(db.String(50), nullable=False)
     uploadedBy = db.Column(db.String(100), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    uploadDate = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
+    uploadDate = db.Column(db.String, nullable=False)
     fileName = db.Column(db.String(255), nullable=False)
 
     def to_dict(self):

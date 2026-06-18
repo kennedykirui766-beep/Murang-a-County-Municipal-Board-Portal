@@ -131,6 +131,7 @@ async function seedData() { }
 
 let currentUser = null;
 let speechUtterance = null;
+let uploadedMeetingFiles = [];
 
 const qs = selector => document.querySelector(selector);
 const qsa = selector => document.querySelectorAll(selector);
@@ -416,8 +417,374 @@ async function deleteMember(id) {
   }
 }
 
-// ============= MEETING FUNCTIONS =============
+// ============= UPDATED MEETING FUNCTIONS WITH FILE PREVIEW =============
 
+// File upload handlers
+function handleFileSelect(event) {
+  const files = event.target.files;
+  handleFiles(files);
+}
+
+function handleFileDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const files = event.dataTransfer.files;
+  handleFiles(files);
+  const dropZone = document.getElementById('uploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('uploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--primary)';
+    dropZone.style.background = 'var(--surface-alt)';
+  }
+}
+
+function handleDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('uploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'danger');
+      continue;
+    }
+    // Check file type
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      toast(`File "${file.name}" is not a supported format.`, 'warning');
+      continue;
+    }
+    
+    // Convert file to base64 and store
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: e.target.result,
+        uploadDate: new Date().toISOString()
+      };
+      uploadedMeetingFiles.push(fileData);
+      displayFileList();
+    };
+    reader.readAsDataURL(file);
+  }
+  // Reset the file input
+  const fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.value = '';
+}
+
+function displayFileList() {
+  const fileList = document.getElementById('fileList');
+  if (!fileList) return;
+  
+  fileList.innerHTML = uploadedMeetingFiles.map((file, index) => {
+    const isImage = file.type && file.type.startsWith('image/');
+    return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--surface-alt); padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border);">
+      ${isImage ? `<img src="${file.data}" style="width:24px; height:24px; object-fit:cover; border-radius:4px;" />` : `<i class="${getFileIcon(file.type)}" style="color:var(--primary);"></i>`}
+      <span style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</span>
+      <span style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeFile(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `}).join('');
+}
+
+function removeFile(index) {
+  uploadedMeetingFiles.splice(index, 1);
+  displayFileList();
+}
+
+function getFileIcon(type) {
+  if (type.includes('pdf')) return 'fas fa-file-pdf';
+  if (type.includes('word') || type.includes('document')) return 'fas fa-file-word';
+  if (type.includes('excel') || type.includes('spreadsheet')) return 'fas fa-file-excel';
+  if (type.includes('powerpoint') || type.includes('presentation')) return 'fas fa-file-powerpoint';
+  if (type.startsWith('image/')) return 'fas fa-file-image';
+  return 'fas fa-file';
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Enhanced Schedule Meeting Modal with Description and File Upload
+async function showScheduleMeetingModal() {
+  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  uploadedMeetingFiles = [];
+  
+  showModal(`
+    <h3><i class="fas fa-calendar-plus"></i> Schedule Meeting</h3>
+    <form id="scheduleMeetingForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Meeting Title <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="mtTitle" required placeholder="Enter meeting title" />
+      </div>
+      
+      <div class="form-group">
+        <label>Description / Agenda</label>
+        <textarea id="mtDescription" rows="4" placeholder="Enter meeting description, agenda items, or key discussion points..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Date <span style="color:var(--danger);">*</span></label>
+        <input type="date" id="mtDate" required />
+      </div>
+      
+      <div class="form-group">
+        <label>Time <span style="color:var(--danger);">*</span></label>
+        <input type="time" id="mtTime" required />
+      </div>
+      
+      <div class="form-group">
+        <label>Location <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="mtLocation" required placeholder="Enter meeting venue" />
+      </div>
+      
+      <div class="form-group">
+        <label>Municipality <span style="color:var(--danger);">*</span></label>
+        <select id="mtMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
+      </div>
+      
+      <div class="form-group">
+        <label>Upload Documents & Images</label>
+        <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
+             id="uploadDropZone" 
+             ondrop="handleFileDrop(event)" 
+             ondragover="handleDragOver(event)"
+             ondragleave="handleDragLeave(event)"
+             onclick="document.getElementById('fileInput').click()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
+          <p style="margin:0.5rem 0; color:var(--text-muted);">
+            Drag & drop files here or click to browse
+          </p>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Supports: PDF, Word, Excel, PowerPoint, Images (JPG, PNG, GIF) • Max 10MB each
+          </p>
+          <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleFileSelect(event)" />
+        </div>
+        <div id="fileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Schedule Meeting</button>
+    </form>
+  `);
+  
+  // Add drag and drop event listeners
+  document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  // Handle form submission
+  byId('scheduleMeetingForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const title = byId('mtTitle').value.trim();
+    const description = byId('mtDescription').value.trim();
+    const date = byId('mtDate').value;
+    const time = byId('mtTime').value;
+    const location = byId('mtLocation').value.trim();
+    const municipality = byId('mtMunicipality').value;
+    
+    if (!title || !date || !time || !location) { 
+      toast('Please fill in all required fields', 'danger'); 
+      return; 
+    }
+    
+    // Create meeting object with file data
+    const meetingData = { 
+      title, 
+      description, 
+      date, 
+      time, 
+      location, 
+      municipality, 
+      status: 'scheduled', 
+      attendees: [], 
+      declined: [],
+      files: uploadedMeetingFiles
+    };
+    
+    const newMeeting = await DB.addMeeting(meetingData);
+    if (newMeeting) {
+        closeModal();
+        toast('Meeting scheduled successfully with ' + uploadedMeetingFiles.length + ' file(s) attached ✅', 'success');
+        navigate('meetings');
+    } else {
+        toast('Failed to schedule meeting', 'danger');
+    }
+  });
+}
+
+// Enhanced View Meeting Files with Preview
+async function viewMeetingFiles(id) {
+  const meetings = await DB.meetings();
+  const meeting = meetings.find(item => item.id === id);
+  if (!meeting || !meeting.files || meeting.files.length === 0) {
+    toast('No files attached to this meeting', 'info');
+    return;
+  }
+
+  // Separate images from other files
+  const images = meeting.files.filter(f => f.type && f.type.startsWith('image/'));
+  const documents = meeting.files.filter(f => f.type && !f.type.startsWith('image/'));
+
+  showModal(`
+    <h3><i class="fas fa-paperclip"></i> Files: ${meeting.title}</h3>
+    <div style="margin-bottom:1rem; color:var(--text-muted);">
+      <span class="badge badge-info">${meeting.files.length} files</span>
+      ${images.length > 0 ? `<span class="badge badge-success">${images.length} images</span>` : ''}
+      ${documents.length > 0 ? `<span class="badge badge-warning">${documents.length} documents</span>` : ''}
+    </div>
+    
+    ${images.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-images"></i> Images (${images.length})
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:0.75rem;">
+          ${images.map((file, index) => `
+            <div style="position:relative; cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--border); transition:all 0.3s;" 
+                 onclick="previewFile(${id}, ${meeting.files.indexOf(file)})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.transform='scale(1.02)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.transform='scale(1)';">
+              <img src="${file.data}" style="width:100%; height:120px; object-fit:cover;" />
+              <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; padding:0.25rem 0.5rem; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${file.name}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    ${documents.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-file-alt"></i> Documents (${documents.length})
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          ${documents.map((file, index) => {
+            const fileIndex = meeting.files.indexOf(file);
+            return `
+            <div style="display:flex; align-items:center; gap:0.75rem; background:var(--surface-alt); padding:0.75rem; border-radius:8px; border:1px solid var(--border); cursor:pointer; transition:all 0.3s;"
+                 onclick="previewFile(${id}, ${fileIndex})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface-alt)';">
+              <i class="${getFileIcon(file.type)}" style="font-size:2rem; color:var(--primary);"></i>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:500; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${file.name}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); downloadMeetingFile(${id}, ${fileIndex})">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+          `}).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    <button class="btn btn-outline btn-block" style="margin-top:0.5rem;" onclick="closeModal()">Close</button>
+  `);
+}
+
+// Preview File in Modal
+function previewFile(meetingId, fileIndex) {
+  const meetings = (async () => { return await DB.meetings(); })();
+  meetings.then(meetingsList => {
+    const meeting = meetingsList.find(item => item.id === meetingId);
+    if (!meeting || !meeting.files || !meeting.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = meeting.files[fileIndex];
+    const isImage = file.type && file.type.startsWith('image/');
+    
+    showModal(`
+      <div style="text-align:center;">
+        <h3 style="margin-bottom:0.5rem;">${file.name}</h3>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+          ${formatFileSize(file.size)} • ${file.type || 'Unknown type'}
+        </div>
+        ${isImage ? `
+          <img src="${file.data}" style="max-width:100%; max-height:70vh; border-radius:8px; border:1px solid var(--border);" />
+        ` : `
+          <div style="padding:2rem; background:var(--surface-alt); border-radius:12px; border:1px solid var(--border);">
+            <i class="${getFileIcon(file.type)}" style="font-size:4rem; color:var(--primary);"></i>
+            <p style="margin-top:1rem; color:var(--text-muted);">
+              This file type cannot be previewed directly.
+            </p>
+            <button class="btn btn-primary" onclick="closeModal(); downloadMeetingFile(${meetingId}, ${fileIndex});">
+              <i class="fas fa-download"></i> Download File
+            </button>
+          </div>
+        `}
+        <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+          ${isImage ? `
+            <button class="btn btn-primary btn-sm" onclick="downloadMeetingFile(${meetingId}, ${fileIndex})">
+              <i class="fas fa-download"></i> Download
+            </button>
+          ` : ''}
+          <button class="btn btn-outline btn-sm" onclick="closeModal(); viewMeetingFiles(${meetingId});">
+            <i class="fas fa-arrow-left"></i> Back to Files
+          </button>
+        </div>
+      </div>
+    `);
+  });
+}
+
+// Download meeting file
+function downloadMeetingFile(meetingId, fileIndex) {
+  const meetings = (async () => { return await DB.meetings(); })();
+  meetings.then(meetingsList => {
+    const meeting = meetingsList.find(item => item.id === meetingId);
+    if (!meeting || !meeting.files || !meeting.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = meeting.files[fileIndex];
+    const link = document.createElement('a');
+    link.href = file.data;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast(`Downloading: ${file.name}`, 'success');
+  });
+}
+
+// Updated renderMeetings to show description and files with preview
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
@@ -436,6 +803,8 @@ async function renderMeetings() {
         const attendeesCount = meeting.attendees ? meeting.attendees.length : 0;
         const declinedCount = meeting.declined ? meeting.declined.length : 0;
         const isUpcoming = new Date(meeting.date) >= new Date();
+        const hasFiles = meeting.files && meeting.files.length > 0;
+        const images = hasFiles ? meeting.files.filter(f => f.type && f.type.startsWith('image/')) : [];
         
         return `
         <div class="card" style="${isUpcoming ? '' : 'opacity:0.7;'}">
@@ -445,12 +814,38 @@ async function renderMeetings() {
               ${meeting.status}
             </span>
           </div>
+          ${meeting.description ? `
+            <div style="margin:0.5rem 0; color:var(--text-muted); font-size:0.9rem; padding:0.5rem; background:var(--surface-alt); border-radius:8px; border-left:3px solid var(--primary);">
+              ${meeting.description}
+            </div>
+          ` : ''}
           <div style="margin:0.65rem 0;color:var(--text-muted);font-size:0.95rem;">
             <i class="fas fa-calendar-day"></i> ${formatDate(meeting.date)} at ${meeting.time}
           </div>
           <div style="color:var(--text-muted);font-size:0.95rem;">
             <i class="fas fa-map-marker-alt"></i> ${meeting.location}
           </div>
+          ${hasFiles ? `
+            <div style="margin-top:0.5rem;">
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                ${images.slice(0, 4).map(file => `
+                  <div style="width:40px; height:40px; border-radius:4px; overflow:hidden; border:1px solid var(--border); cursor:pointer;"
+                       onclick="viewMeetingFiles(${meeting.id})">
+                    <img src="${file.data}" style="width:100%; height:100%; object-fit:cover;" />
+                  </div>
+                `).join('')}
+                ${meeting.files.length > 4 ? `
+                  <span class="file-tag" style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--surface-alt); padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid var(--border); cursor:pointer;" onclick="viewMeetingFiles(${meeting.id})">
+                    +${meeting.files.length - 4} more
+                  </span>
+                ` : ''}
+                <span class="file-tag" style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--surface-alt); padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid var(--border); cursor:pointer;" onclick="viewMeetingFiles(${meeting.id})">
+                  <i class="fas fa-paperclip" style="font-size:0.7rem;"></i>
+                  ${meeting.files.length} files
+                </span>
+              </div>
+            </div>
+          ` : ''}
           <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;display:flex;gap:1rem;flex-wrap:wrap;">
             <span><i class="fas fa-check-circle" style="color:var(--success);"></i> ${attendeesCount} attending</span>
             ${declinedCount > 0 ? `<span><i class="fas fa-times-circle" style="color:var(--danger);"></i> ${declinedCount} declined</span>` : ''}
@@ -484,6 +879,7 @@ async function renderMeetings() {
               <button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})">
                 <i class="fas fa-list"></i> View Attendance
               </button>
+              ${hasFiles ? `<button class="btn btn-secondary btn-sm" onclick="viewMeetingFiles(${meeting.id})"><i class="fas fa-paperclip"></i> Files (${meeting.files.length})</button>` : ''}
               <button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})">
                 <i class="fas fa-trash"></i>
               </button>
@@ -496,38 +892,6 @@ async function renderMeetings() {
       `}).join('') : '<div class="card text-center text-muted">No meetings scheduled yet.</div>'}
     </div>
   `);
-}
-
-async function showScheduleMeetingModal() {
-  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
-  showModal(`
-    <h3><i class="fas fa-calendar-plus"></i> Schedule Meeting</h3>
-    <form id="scheduleMeetingForm">
-      <div class="form-group"><label>Title</label><input type="text" id="mtTitle" required /></div>
-      <div class="form-group"><label>Date</label><input type="date" id="mtDate" required /></div>
-      <div class="form-group"><label>Time</label><input type="time" id="mtTime" required /></div>
-      <div class="form-group"><label>Location</label><input type="text" id="mtLocation" required /></div>
-      <div class="form-group"><label>Municipality</label><select id="mtMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select></div>
-      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Schedule</button>
-    </form>
-  `);
-  byId('scheduleMeetingForm').addEventListener('submit', async function (event) {
-    event.preventDefault();
-    const title = byId('mtTitle').value.trim();
-    const date = byId('mtDate').value;
-    const time = byId('mtTime').value;
-    const location = byId('mtLocation').value.trim();
-    const municipality = byId('mtMunicipality').value;
-    if (!title || !date || !time || !location) { toast('Complete all fields', 'danger'); return; }
-    const newMeeting = await DB.addMeeting({ title, date, time, location, municipality, status: 'scheduled', attendees: [], declined: [] });
-    if (newMeeting) {
-        closeModal();
-        toast('Meeting scheduled', 'success');
-        navigate('meetings');
-    } else {
-        toast('Failed to schedule meeting', 'danger');
-    }
-  });
 }
 
 async function confirmAttendance(id) {
@@ -1105,6 +1469,12 @@ async function deleteMeeting(id) {
           <span><i class="fas fa-map-marker-alt"></i> Location:</span>
           <strong>${meeting.location}</strong>
         </div>
+        ${meeting.description ? `
+          <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+            <span><i class="fas fa-align-left"></i> Description:</span>
+            <strong style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${meeting.description}</strong>
+          </div>
+        ` : ''}
         <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
           <span><i class="fas fa-users"></i> Attendees:</span>
           <strong>${attendeeCount} attending</strong>
@@ -1113,6 +1483,12 @@ async function deleteMeeting(id) {
           <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
             <span><i class="fas fa-times-circle" style="color:var(--danger);"></i> Declined:</span>
             <strong style="color:var(--danger);">${declineCount} declined</strong>
+          </div>
+        ` : ''}
+        ${meeting.files && meeting.files.length > 0 ? `
+          <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+            <span><i class="fas fa-paperclip"></i> Files:</span>
+            <strong>${meeting.files.length} attached</strong>
           </div>
         ` : ''}
       </div>
@@ -1139,7 +1515,7 @@ async function confirmDeleteMeeting(id) {
   }
 }
 
-// ============= REST OF THE CODE (unchanged) =============
+// ============= REST OF THE CODE (unchanged functions) =============
 
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
@@ -2310,6 +2686,9 @@ window.showDeclineModal = showDeclineModal;
 window.viewAttendance = viewAttendance;
 window.deleteMeeting = deleteMeeting;
 window.confirmDeleteMeeting = confirmDeleteMeeting;
+window.viewMeetingFiles = viewMeetingFiles;
+window.downloadMeetingFile = downloadMeetingFile;
+window.previewFile = previewFile;
 window.showUploadMinutesModal = showUploadMinutesModal;
 window.showAddComplaintModal = showAddComplaintModal;
 window.assignComplaint = assignComplaint;
@@ -2346,5 +2725,10 @@ window.toggleAttendanceList = toggleAttendanceList;
 window.toggleDeclinedList = toggleDeclinedList;
 window.printAttendance = printAttendance;
 window.downloadAttendanceHTML = downloadAttendanceHTML;
+window.handleFileSelect = handleFileSelect;
+window.handleFileDrop = handleFileDrop;
+window.handleDragOver = handleDragOver;
+window.handleDragLeave = handleDragLeave;
+window.removeFile = removeFile;
 
 window.addEventListener('DOMContentLoaded', boot);

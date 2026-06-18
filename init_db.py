@@ -78,56 +78,63 @@ def seed_database():
         ]
         db.session.add_all(members_data)
 
-        # --- Meetings with proper JSON for attendees and declined ---
+        # --- Meetings with description and files ---
         meetings_data = [
             Meeting(
-                title='Kenol Budget Meeting', 
-                date='2026-06-20', 
-                time='10:00', 
-                location='Kenol Hall', 
-                municipality='kenol', 
-                status='scheduled', 
-                attendees=json.dumps([]), 
-                declined=json.dumps([])
+                title='Kenol Budget Meeting',
+                description='Annual budget review and planning for Kenol municipality. Key agenda items: Infrastructure development, Community projects, and Revenue collection.',
+                date='2026-06-20',
+                time='10:00',
+                location='Kenol Hall',
+                municipality='kenol',
+                status='scheduled',
+                attendees=json.dumps([]),
+                declined=json.dumps([]),
+                files=json.dumps([])
             ),
             Meeting(
-                title='Kangare Development Forum', 
-                date='2026-06-22', 
-                time='14:00', 
-                location='Kangare Centre', 
-                municipality='kangare', 
-                status='scheduled', 
-                attendees=json.dumps([]), 
-                declined=json.dumps([])
+                title='Kangare Development Forum',
+                description='Discussion on community development projects, water supply improvements, and road maintenance in Kangare area.',
+                date='2026-06-22',
+                time='14:00',
+                location='Kangare Centre',
+                municipality='kangare',
+                status='scheduled',
+                attendees=json.dumps([]),
+                declined=json.dumps([]),
+                files=json.dumps([])
             ),
             Meeting(
-                title="Murang'a Town Council", 
-                date='2026-06-25', 
-                time='09:30', 
-                location='Town Hall', 
-                municipality='muranga_town', 
-                status='scheduled', 
-                attendees=json.dumps([]), 
-                declined=json.dumps([])
+                title="Murang'a Town Council",
+                description='Town council meeting to discuss urban planning, waste management, and business licensing in Murang\'a Town.',
+                date='2026-06-25',
+                time='09:30',
+                location='Town Hall',
+                municipality='muranga_town',
+                status='scheduled',
+                attendees=json.dumps([]),
+                declined=json.dumps([]),
+                files=json.dumps([])
             )
         ]
         db.session.add_all(meetings_data)
 
+        # --- Complaints ---
         complaints_data = [
             Complaint(
-                title='Road damage in Kenol', 
-                description='Potholes on main road near Kenol market.', 
-                municipality='kenol', 
-                status='pending', 
-                assignedTo='', 
+                title='Road damage in Kenol',
+                description='Potholes on main road near Kenol market causing traffic congestion and vehicle damage.',
+                municipality='kenol',
+                status='pending',
+                assignedTo='',
                 date=today
             ),
             Complaint(
-                title='Water shortage Kangare', 
-                description='Irregular water supply in Kangare estate.', 
-                municipality='kangare', 
-                status='in_progress', 
-                assignedTo='Kenol Municipal Officer', 
+                title='Water shortage Kangare',
+                description='Irregular water supply in Kangare estate for the past two weeks. Residents are facing severe water shortages.',
+                municipality='kangare',
+                status='in_progress',
+                assignedTo='Kenol Municipal Officer',
                 date=today
             )
         ]
@@ -181,6 +188,27 @@ def seed_database():
             )
         ]
         db.session.add_all(broadcasts_data)
+
+        # --- Documents ---
+        documents_data = [
+            Document(
+                name='Annual Report 2025',
+                type='PDF',
+                uploadedBy='Super Developer',
+                municipality='all',
+                uploadDate=today,
+                fileName='Annual_Report_2025.pdf'
+            ),
+            Document(
+                name='Kenol Budget 2026',
+                type='Excel',
+                uploadedBy='Kenol Municipal Officer',
+                municipality='kenol',
+                uploadDate=today,
+                fileName='Kenol_Budget_2026.xlsx'
+            )
+        ]
+        db.session.add_all(documents_data)
 
         db.session.commit()
         print("Database seeded successfully!")

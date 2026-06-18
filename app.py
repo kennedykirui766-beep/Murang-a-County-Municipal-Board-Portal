@@ -11,6 +11,7 @@ import json
 app = Flask(__name__, static_folder='.')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///municipal_board.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file upload
 
 CORS(app)
 
@@ -178,25 +179,50 @@ def add_entity_item(entity):
         data['password'] = generate_password_hash(data.get('password'))
         data['last_seen'] = ''
     
-    # Handle meeting attendees and declined as JSON
+    # Handle meeting fields
     if entity == 'meetings':
-        # Ensure attendees is a list and convert to JSON string
+        # Handle attendees
         attendees = data.get('attendees', [])
-        if isinstance(attendees, str):
+        if isinstance(attendees, list):
+            data['attendees'] = json.dumps(attendees)
+        elif isinstance(attendees, str):
             try:
-                attendees = json.loads(attendees)
+                json.loads(attendees)
+                data['attendees'] = attendees
             except:
-                attendees = []
-        data['attendees'] = json.dumps(attendees)
+                data['attendees'] = json.dumps([])
+        else:
+            data['attendees'] = json.dumps([])
         
-        # Ensure declined is a list and convert to JSON string
+        # Handle declined
         declined = data.get('declined', [])
-        if isinstance(declined, str):
+        if isinstance(declined, list):
+            data['declined'] = json.dumps(declined)
+        elif isinstance(declined, str):
             try:
-                declined = json.loads(declined)
+                json.loads(declined)
+                data['declined'] = declined
             except:
-                declined = []
-        data['declined'] = json.dumps(declined)
+                data['declined'] = json.dumps([])
+        else:
+            data['declined'] = json.dumps([])
+        
+        # Handle files
+        files = data.get('files', [])
+        if isinstance(files, list):
+            data['files'] = json.dumps(files)
+        elif isinstance(files, str):
+            try:
+                json.loads(files)
+                data['files'] = files
+            except:
+                data['files'] = json.dumps([])
+        else:
+            data['files'] = json.dumps([])
+        
+        # Ensure description is set
+        if 'description' not in data:
+            data['description'] = ''
 
     new_item = Model(**data)
     db.session.add(new_item)
@@ -220,16 +246,15 @@ def update_entity_item(entity, item_id):
     if entity == 'users' and 'password' in updated_data and updated_data['password']:
         updated_data['password'] = generate_password_hash(updated_data['password'])
 
-    # Handle meeting attendees and declined as JSON
+    # Handle meeting fields
     if entity == 'meetings':
-        # Process attendees
+        # Handle attendees
         if 'attendees' in updated_data:
             attendees = updated_data['attendees']
             if isinstance(attendees, list):
                 updated_data['attendees'] = json.dumps(attendees)
             elif isinstance(attendees, str):
                 try:
-                    # Validate it's proper JSON
                     json.loads(attendees)
                     updated_data['attendees'] = attendees
                 except:
@@ -237,20 +262,33 @@ def update_entity_item(entity, item_id):
             else:
                 updated_data['attendees'] = json.dumps([])
         
-        # Process declined
+        # Handle declined
         if 'declined' in updated_data:
             declined = updated_data['declined']
             if isinstance(declined, list):
                 updated_data['declined'] = json.dumps(declined)
             elif isinstance(declined, str):
                 try:
-                    # Validate it's proper JSON
                     json.loads(declined)
                     updated_data['declined'] = declined
                 except:
                     updated_data['declined'] = json.dumps([])
             else:
                 updated_data['declined'] = json.dumps([])
+        
+        # Handle files
+        if 'files' in updated_data:
+            files = updated_data['files']
+            if isinstance(files, list):
+                updated_data['files'] = json.dumps(files)
+            elif isinstance(files, str):
+                try:
+                    json.loads(files)
+                    updated_data['files'] = files
+                except:
+                    updated_data['files'] = json.dumps([])
+            else:
+                updated_data['files'] = json.dumps([])
 
     # Update only the fields that were provided
     for key, value in updated_data.items():
@@ -312,6 +350,17 @@ def replace_entity_list(entity):
                 item_data['declined'] = json.dumps(declined)
             elif not isinstance(declined, str):
                 item_data['declined'] = json.dumps([])
+            
+            # Ensure files is JSON string
+            files = item_data.get('files', [])
+            if isinstance(files, list):
+                item_data['files'] = json.dumps(files)
+            elif not isinstance(files, str):
+                item_data['files'] = json.dumps([])
+            
+            # Ensure description exists
+            if 'description' not in item_data:
+                item_data['description'] = ''
                 
         new_items.append(Model(**item_data))
         
