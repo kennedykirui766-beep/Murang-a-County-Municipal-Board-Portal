@@ -3398,6 +3398,123 @@ async function loginWithOAuth(providerName, providerId) {
     });
 }
 
+// ============= PROFILE SETTINGS FUNCTIONS =============
+
+// ============= PROFILE SETTINGS FUNCTIONS =============
+
+async function loadProfileSettings() {
+  if (!currentUser) return;
+  
+  const nameInput = document.getElementById('profileName');
+  const emailInput = document.getElementById('profileEmail');
+  const roleDisplay = document.getElementById('settingsUserRole');
+  const muniDisplay = document.getElementById('navMunicipality');
+  const roleBadge = document.getElementById('profileRoleBadge');
+  const muniBadge = document.getElementById('profileMuniBadge');
+  
+  if (nameInput) nameInput.value = currentUser.name || '';
+  if (emailInput) emailInput.value = currentUser.email || '';
+  if (roleDisplay) roleDisplay.textContent = getRoleLabel(currentUser.role);
+  if (muniDisplay) muniDisplay.textContent = currentUser.municipality === 'all' ? 'All Municipalities' : getMunicipalityLabel(currentUser.municipality);
+  if (roleBadge) roleBadge.textContent = getRoleLabel(currentUser.role);
+  if (muniBadge) muniBadge.textContent = currentUser.municipality === 'all' ? 'All Municipalities' : getMunicipalityLabel(currentUser.municipality);
+}
+
+// Handle profile form submission
+document.addEventListener('DOMContentLoaded', function() {
+  const profileForm = document.getElementById('profileForm');
+  if (profileForm) {
+    profileForm.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      
+      const name = document.getElementById('profileName').value.trim();
+      const password = document.getElementById('profilePassword').value;
+      const confirmPassword = document.getElementById('profileConfirmPassword').value;
+      const messageEl = document.getElementById('profileMessage');
+      
+      // Validate name
+      if (!name) {
+        showProfileMessage('Please enter your full name.', 'danger');
+        return;
+      }
+      
+      // Validate passwords if provided
+      if (password && password.length < 6) {
+        showProfileMessage('Password must be at least 6 characters long.', 'danger');
+        return;
+      }
+      
+      if (password && password !== confirmPassword) {
+        showProfileMessage('Passwords do not match.', 'danger');
+        return;
+      }
+      
+      try {
+        const updateData = { name };
+        if (password) {
+          updateData.password = password;
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/users/${currentUser.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        });
+        
+        if (response.ok) {
+          const updatedUser = await response.json();
+          currentUser = updatedUser;
+          localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
+          
+          // Update display
+          const nameEl = document.getElementById('settingsUserName');
+          if (nameEl) nameEl.textContent = currentUser.name;
+          
+          const navNameEl = document.getElementById('navUserName');
+          if (navNameEl) navNameEl.textContent = currentUser.name;
+          
+          showProfileMessage('Profile updated successfully!', 'success');
+          
+          // Clear password fields
+          document.getElementById('profilePassword').value = '';
+          document.getElementById('profileConfirmPassword').value = '';
+          
+          // Refresh after 2 seconds
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          const error = await response.json();
+          showProfileMessage(error.error || 'Failed to update profile.', 'danger');
+        }
+      } catch (error) {
+        console.error('Update error:', error);
+        showProfileMessage('An error occurred. Please try again.', 'danger');
+      }
+    });
+  }
+  
+  // Load profile data if on settings page
+  if (document.body.dataset.page === 'settings') {
+    setTimeout(loadProfileSettings, 500);
+  }
+});
+
+function showProfileMessage(message, type = 'info') {
+  const messageEl = document.getElementById('profileMessage');
+  if (!messageEl) return;
+  
+  messageEl.textContent = message;
+  messageEl.className = `alert alert-${type}`;
+  messageEl.style.display = 'block';
+  
+  // Auto-hide after 5 seconds
+  clearTimeout(messageEl._timeout);
+  messageEl._timeout = setTimeout(() => {
+    messageEl.style.display = 'none';
+  }, 5000);
+}
+
 // Make functions globally accessible
 window.navigate = navigate;
 window.showAddMemberModal = showAddMemberModal;

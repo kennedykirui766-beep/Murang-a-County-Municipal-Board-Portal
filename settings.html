@@ -27,7 +27,10 @@
   </div>
 
   <nav class="navbar">
-    <div class="brand"><i class="fas fa-landmark"></i> Murang'a Board Portal</div>
+    <div class="brand">
+      <img src="logo.png" alt="Murang'a County Logo" class="nav-logo" />
+      <span>Murang'a Board Portal</span>
+    </div>
     <div class="nav-actions">
       <span class="user-badge"><i class="fas fa-user-circle"></i> <span id="settingsUserName">User</span> (<span id="settingsUserRole">role</span>)</span>
       <span class="user-badge" style="background:var(--gray-200);color:var(--gray-700);" id="navMunicipality">Municipality</span>
@@ -39,6 +42,49 @@
     <div class="page-header">
       <h2><i class="fas fa-cog"></i> Settings</h2>
       <button class="btn btn-outline btn-sm" onclick="window.location.href='home.html'"><i class="fas fa-arrow-left"></i> Back to Home</button>
+    </div>
+
+    <!-- Profile Settings Section with Image and Form Side by Side -->
+    <div class="card profile-card">
+      <div class="profile-container">
+        <div class="profile-image-section">
+          <div class="profile-overlay-content">
+            <img src="logo.png" alt="Murang'a County Logo" class="profile-logo" />
+            <h3>Murang'a County</h3>
+            <p>Municipal Board Portal</p>
+            <div class="profile-user-info">
+              <span class="profile-role-badge" id="profileRoleBadge">Role</span>
+              <span class="profile-muni-badge" id="profileMuniBadge">Municipality</span>
+            </div>
+          </div>
+        </div>
+        <div class="profile-form-section">
+          <h3><i class="fas fa-user-edit"></i> Edit Profile</h3>
+          <form id="profileForm">
+            <div class="form-group">
+              <label for="profileName"><i class="fas fa-user"></i> Full Name</label>
+              <input type="text" id="profileName" placeholder="Enter your full name" required />
+            </div>
+            <div class="form-group">
+              <label for="profileEmail"><i class="fas fa-envelope"></i> Email</label>
+              <input type="email" id="profileEmail" placeholder="Enter your email" required disabled />
+              <small>Email cannot be changed. Contact administrator for email updates.</small>
+            </div>
+            <div class="form-group">
+              <label for="profilePassword"><i class="fas fa-lock"></i> New Password</label>
+              <input type="password" id="profilePassword" placeholder="Enter new password (leave blank to keep current)" />
+            </div>
+            <div class="form-group">
+              <label for="profileConfirmPassword"><i class="fas fa-check-circle"></i> Confirm New Password</label>
+              <input type="password" id="profileConfirmPassword" placeholder="Confirm new password" />
+            </div>
+            <div id="profileMessage" style="display:none;" class="alert alert-success"></div>
+            <button type="submit" class="btn-update-profile">
+              <i class="fas fa-save"></i> Update Profile
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -65,16 +111,16 @@
     </div>
   </main>
 
-  <script src="app_backend.js"></script>
-
   <!-- Fine Print Footer for Settings Page -->
-<footer style="text-align: center; padding: 1.5rem; font-size: 0.75rem; color: #666; border-top: 1px solid #eee; margin-top: 2rem;">
-  <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
-  <p>For technical support, please contact the IT Department.</p>
-</footer>
+  <footer style="text-align: center; padding: 1.5rem; font-size: 0.75rem; color: #666; border-top: 1px solid #eee; margin-top: 2rem;">
+    <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
+    <p>For technical support, please contact the IT Department.</p>
+  </footer>
 
-<script>
-  document.getElementById('currentYear').textContent = new Date().getFullYear();
-</script>
+  <script>
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+  </script>
+
+  <script src="app_backend.js"></script>
 </body>
 </html>

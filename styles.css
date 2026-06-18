@@ -1108,3 +1108,340 @@ tbody tr:hover {
     font-size: 0.85rem;
   }
 }
+
+/* ============= PROFILE SETTINGS STYLES ============= */
+
+#profileForm .form-group input[disabled] {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: var(--surface-muted);
+}
+
+#profileForm small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+#profileMessage {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  animation: slideIn 0.3s ease;
+}
+
+/* ============= RESPONSIVE ADJUSTMENTS ============= */
+
+@media (max-width: 480px) {
+  .login-logo {
+    width: 64px;
+    height: 64px;
+  }
+  
+  .login-logo-container h1 {
+    font-size: 1.5rem;
+  }
+  
+  .login-logo-container .subtitle {
+    font-size: 0.85rem;
+  }
+}
+
+/* ============= PROFILE SETTINGS SIDEBAR STYLES ============= */
+
+.profile-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.profile-container {
+  display: flex;
+  min-height: 450px;
+}
+
+/* Left Side - Image/Logo Section with Background Image */
+.profile-image-section {
+  flex: 0 0 50%;
+  background-image: url('muranga-house.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: white;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  min-height: 450px;
+}
+
+/* Overlay for better text readability */
+.profile-image-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 0;
+}
+
+.profile-overlay-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.profile-logo {
+  width: 130px;
+  height: 130px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profile-logo:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.profile-image-section h3 {
+  font-size: 1.4rem;
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.profile-image-section p {
+  font-size: 0.95rem;
+  opacity: 0.9;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.profile-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 200px;
+  margin-top: 0.5rem;
+}
+
+.profile-role-badge,
+.profile-muni-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.profile-role-badge:hover,
+.profile-muni-badge:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Right Side - Form Section */
+.profile-form-section {
+  flex: 1;
+  padding: 2rem 3rem;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 450px;
+}
+
+.profile-form-section h3 {
+  font-size: 1.3rem;
+  margin-bottom: 1.5rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.profile-form-section .form-group {
+  margin-bottom: 1.2rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.profile-form-section .form-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.profile-form-section .form-group input {
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  transition: all 0.3s ease;
+}
+
+.profile-form-section .form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.12);
+}
+
+.profile-form-section .form-group input[disabled] {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: var(--surface-muted);
+}
+
+.profile-form-section .form-group small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.profile-form-section #profileMessage {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ============= UPDATED PROFILE BUTTON STYLES ============= */
+
+.profile-form-section .btn-update-profile {
+  max-width: 200px;
+  margin: 0.5rem auto 0;
+  padding: 0.7rem 1.5rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.25);
+}
+
+.profile-form-section .btn-update-profile:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(46, 125, 50, 0.35);
+}
+
+.profile-form-section .btn-update-profile:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 10px rgba(46, 125, 50, 0.2);
+}
+
+.profile-form-section .btn-update-profile i {
+  font-size: 0.9rem;
+}
+
+/* ============= RESPONSIVE ADJUSTMENTS ============= */
+
+@media (max-width: 768px) {
+  .profile-container {
+    flex-direction: column;
+  }
+  
+  .profile-image-section {
+    flex: 0 0 auto;
+    padding: 2rem 1.5rem;
+    min-height: 250px;
+  }
+  
+  .profile-logo {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .profile-image-section h3 {
+    font-size: 1.1rem;
+  }
+  
+  .profile-form-section {
+    padding: 1.5rem;
+    min-height: auto;
+  }
+  
+  .profile-form-section .form-group {
+    max-width: 100%;
+  }
+  
+  .profile-form-section #profileMessage {
+    max-width: 100%;
+  }
+  
+  .profile-form-section .btn-update-profile {
+    max-width: 180px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-image-section {
+    min-height: 200px;
+  }
+  
+  .profile-logo {
+    width: 64px;
+    height: 64px;
+  }
+  
+  .profile-image-section h3 {
+    font-size: 0.95rem;
+  }
+  
+  .profile-image-section p {
+    font-size: 0.8rem;
+  }
+  
+  .profile-form-section {
+    padding: 1rem;
+  }
+  
+  .profile-role-badge,
+  .profile-muni-badge {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .profile-form-section .btn-update-profile {
+    max-width: 160px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
