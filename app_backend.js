@@ -224,7 +224,6 @@ function showAppInfo() {
   const usersNav = byId('navUsers');
   if (usersNav) usersNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
   
-  // Show Track Users link only for Super Admin
   const trackNav = byId('navTrack');
   if (trackNav) trackNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
 }
@@ -245,12 +244,162 @@ async function navigate(page) {
     case 'complaints': await renderComplaints(); break;
     case 'documents': await renderDocuments(); break;
     case 'users': await renderUsers(); break;
-    case 'track': await renderTrackUsers(); break; // Tracking feature
+    case 'track': await renderTrackUsers(); break;
     case 'emails': await renderEmails(); break;
     case 'broadcasts': await renderBroadcasts(); break;
     default: render('<div class="card"><h2>Page not found</h2></div>');
   }
 }
+
+// ============= LOGIN & REGISTER VIEWS =============
+
+async function renderLogin() {
+  const container = byId('app') || document.body;
+  
+  if (currentUser) {
+    await navigate('dashboard');
+    return;
+  }
+
+  container.innerHTML = `
+    <div id="loginPage">
+      <div class="login-card">
+        <div class="logo-icon">
+          <i class="fas fa-university"></i>
+        </div>
+        <h1>Municipal Board Portal</h1>
+        <p class="subtitle">Sign in to manage your municipality</p>
+        
+        <div id="loginAlert" style="display:none;"></div>
+
+        <form id="loginForm">
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="loginEmail" required placeholder="admin@muranga.go.ke" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" required placeholder="••••••••" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </button>
+        </form>
+
+        <div style="margin-top: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+          Don't have an account? 
+          <a href="#" onclick="renderRegister()" style="color: var(--primary); font-weight: 600;">Create Account</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  byId('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const email = byId('loginEmail').value.trim();
+    const password = byId('loginPassword').value;
+    const alertBox = byId('loginAlert');
+    
+    if (!email || !password) {
+      alertBox.style.display = 'block';
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = 'Please fill in all fields.';
+      return;
+    }
+
+    const success = await login(email, password);
+    if (success) {
+      alertBox.style.display = 'none';
+      await renderDashboard();
+    } else {
+      alertBox.style.display = 'block';
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = 'Invalid email or password.';
+    }
+  });
+}
+
+async function renderRegister() {
+  const container = byId('app') || document.body;
+
+  container.innerHTML = `
+    <div id="loginPage">
+      <div class="login-card" style="max-width: 500px;">
+        <div class="logo-icon">
+          <i class="fas fa-user-plus"></i>
+        </div>
+        <h1>Create Account</h1>
+        <p class="subtitle">Join the Municipal Board Portal</p>
+        
+        <div id="registerAlert" style="display:none;"></div>
+
+        <form id="registerForm">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="regName" required placeholder="John Doe" />
+          </div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="regEmail" required placeholder="john@example.com" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="regPassword" required minlength="6" placeholder="••••••••" />
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="regConfirmPassword" required placeholder="••••••••" />
+          </div>
+          <div class="form-group">
+            <label>Municipality</label>
+            <select id="regMunicipality">
+              <option value="kenol">Kenol</option>
+              <option value="kangare">Kangare</option>
+              <option value="muranga_town">Murang'a Town</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <i class="fas fa-user-plus"></i> Create Account
+          </button>
+        </form>
+
+        <div style="margin-top: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+          Already have an account? 
+          <a href="#" onclick="renderLogin()" style="color: var(--primary); font-weight: 600;">Login</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  byId('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const name = byId('regName').value.trim();
+    const email = byId('regEmail').value.trim();
+    const password = byId('regPassword').value;
+    const confirmPassword = byId('regConfirmPassword').value;
+    const municipality = byId('regMunicipality').value;
+    const alertBox = byId('registerAlert');
+
+    if (password !== confirmPassword) {
+      alertBox.style.display = 'block';
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = 'Passwords do not match.';
+      return;
+    }
+
+    try {
+      await DB.registerUser({ name, email, password, municipality, role: 'member' });
+      toast('Account created successfully! Please login.', 'success');
+      renderLogin();
+    } catch (error) {
+      alertBox.style.display = 'block';
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = error.message || 'Registration failed. Email may already exist.';
+    }
+  });
+}
+
+// ============= DASHBOARD =============
 
 async function renderDashboard() {
   const members = getAllowedItems(await DB.members());
@@ -327,6 +476,8 @@ async function renderDashboard() {
     </div>
   `);
 }
+
+// ============= MEMBERS =============
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
@@ -417,6 +568,8 @@ async function deleteMember(id) {
   }
 }
 
+// ============= MEETINGS (Updated with Features & Styles) =============
+
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
@@ -427,7 +580,13 @@ async function renderMeetings() {
       ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showScheduleMeetingModal()"><i class="fas fa-plus"></i> Schedule</button>' : ''}
     </div>
     <div class="grid-2">
-      ${meetings.length ? meetings.map(meeting => `
+      ${meetings.length ? meetings.map(meeting => {
+        const isAttending = meeting.attendees && meeting.attendees.includes(currentUser.email);
+        const isDeclined = meeting.declined && meeting.declined.find(d => d.email === currentUser.email);
+        const declineReason = isDeclined ? isDeclined.reason : null;
+        const declineComments = isDeclined ? isDeclined.comments : null;
+        
+        return `
         <div class="card">
           <div class="flex-between" style="display:flex;justify-content:space-between;align-items:start;gap:0.75rem;flex-wrap:wrap;">
             <strong>${meeting.title}</strong>
@@ -437,18 +596,30 @@ async function renderMeetings() {
           <div style="color:var(--text-muted);font-size:0.95rem;"><i class="fas fa-map-marker-alt"></i> ${meeting.location}</div>
           
           <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;">
-            <i class="fas fa-users"></i> ${meeting.attendees.length} attending | 
-            <i class="fas fa-user-times"></i> ${(meeting.declined || []).length} declined
+            <i class="fas fa-users"></i> ${meeting.attendees ? meeting.attendees.length : 0} attending
+            ${meeting.declined && meeting.declined.length > 0 ? ` • <i class="fas fa-times-circle" style="color:#dc2626;"></i> ${meeting.declined.length} declined` : ''}
           </div>
           
-          <div class="actions" style="margin-top:0.85rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
-            <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})"><i class="fas fa-check"></i> Attend</button>
-            <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})"><i class="fas fa-times"></i> Decline</button>
+          ${isDeclined ? `
+            <div class="decline-reason">
+              <strong><i class="fas fa-times-circle" style="color:#dc2626;"></i> You declined:</strong> ${declineReason}
+              ${declineComments ? `<br /><span style="font-size:0.8rem;">Comments: ${declineComments}</span>` : ''}
+            </div>
+          ` : ''}
+          
+          <div class="actions" style="margin-top:0.85rem;">
+            ${!isAttending && !isDeclined ? `
+              <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})"><i class="fas fa-check"></i> Attend</button>
+              <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})"><i class="fas fa-times"></i> Decline</button>
+            ` : ''}
+            ${isAttending ? `
+              <button class="btn btn-warning btn-sm" onclick="processDecline(${meeting.id}, 'Cancel Attendance', '')"><i class="fas fa-times"></i> Cancel Attendance</button>
+            ` : ''}
             ${canAdd ? `<button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})"><i class="fas fa-list"></i> View Attendance</button>` : ''}
             ${canAdd ? `<button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})"><i class="fas fa-trash"></i></button>` : ''}
           </div>
         </div>
-      `).join('') : '<div class="card text-center text-muted">No meetings scheduled yet.</div>'}
+      `}).join('') : '<div class="card text-center text-muted">No meetings scheduled yet.</div>'}
     </div>
   `);
 }
@@ -509,54 +680,114 @@ async function confirmAttendance(id) {
 }
 
 async function showDeclineModal(id) {
+  // Check if already declined to prevent double declining
+  const meetings = await DB.meetings();
+  const meeting = meetings.find(m => m.id === id);
+  if(!meeting) return;
+
+  const isDeclined = meeting.declined && meeting.declined.find(d => d.email === currentUser.email);
+  
+  if(isDeclined) {
+      toast('You have already declined this meeting.', 'info');
+      return;
+  }
+
   showModal(`
     <h3><i class="fas fa-times-circle"></i> Decline Meeting</h3>
-    <form id="declineMeetingForm">
+    <p style="color: var(--text-muted); margin-bottom: 1rem;">Please provide a reason for not attending this meeting.</p>
+    <form id="declineForm">
       <div class="form-group">
-        <label>Please provide a reason for not attending:</label>
-        <textarea id="declineReason" rows="4" required placeholder="E.g., Out of office, sick leave, scheduling conflict..."></textarea>
+        <label>Reason for Declining</label>
+        <select id="declineReason" required>
+          <option value="">Select a reason...</option>
+          <option value="Schedule Conflict">Schedule Conflict</option>
+          <option value="Prior Commitment">Prior Commitment</option>
+          <option value="Travel Constraints">Travel Constraints</option>
+          <option value="Health Reasons">Health Reasons</option>
+          <option value="Emergency">Emergency</option>
+          <option value="Other">Other</option>
+        </select>
       </div>
-      <button type="submit" class="btn btn-warning btn-block"><i class="fas fa-paper-plane"></i> Submit Decline</button>
+      <div class="form-group">
+        <label>Additional Comments (Optional)</label>
+        <textarea id="declineComments" rows="3" placeholder="Provide more details about why you can't attend..."></textarea>
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="submit" class="btn btn-danger">
+          <i class="fas fa-times"></i> Decline Meeting
+        </button>
+        <button type="button" class="btn btn-outline" onclick="closeModal()">
+          <i class="fas fa-arrow-left"></i> Cancel
+        </button>
+      </div>
     </form>
   `);
   
-  byId('declineMeetingForm').addEventListener('submit', async function (event) {
-    event.preventDefault();
-    const reason = byId('declineReason').value.trim();
-    if (!reason) { toast('Please enter a reason', 'danger'); return; }
-    
-    const meetings = await DB.meetings();
-    const meeting = meetings.find(item => item.id === id);
-    if (!meeting) return;
-
-    // Initialize declined array if it doesn't exist
-    if (!meeting.declined) meeting.declined = [];
-
-    // Remove from attendees if they were previously attending
-    meeting.attendees = meeting.attendees.filter(email => email !== currentUser.email);
-
-    // Check if they already declined, if so update reason, else add new record
-    const existingDecline = meeting.declined.find(d => d.email === currentUser.email);
-    if (existingDecline) {
-      existingDecline.reason = reason;
-    } else {
-      meeting.declined.push({
-        email: currentUser.email,
-        name: currentUser.name,
-        reason: reason,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    const success = await DB._updateItem('meetings', id, meeting);
-    if (success) {
-      closeModal();
-      toast('Decline submitted successfully', 'success');
-      await renderMeetings();
-    } else {
-      toast('Failed to submit decline', 'danger');
-    }
+  byId('declineForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const reason = byId('declineReason').value;
+    const comments = byId('declineComments').value.trim();
+    await processDecline(id, reason, comments);
   });
+}
+
+async function processDecline(meetingId, reason, comments) {
+  const meetings = await DB.meetings();
+  const meeting = meetings.find(item => item.id === meetingId);
+  if (!meeting) {
+    toast('Meeting not found', 'danger');
+    return;
+  }
+  
+  // If this is a "Cancel Attendance" action, we just remove them and don't add a decline record.
+  if (reason === 'Cancel Attendance') {
+      meeting.attendees = meeting.attendees.filter(email => email !== currentUser.email);
+      if (meeting.declined) {
+          meeting.declined = meeting.declined.filter(d => d.email !== currentUser.email);
+      }
+      const success = await DB._updateItem('meetings', meetingId, meeting);
+      if (success) {
+          closeModal();
+          toast('Attendance cancelled.', 'info');
+          await renderMeetings();
+      }
+      return;
+  }
+
+  // Normal Decline logic
+  // Initialize declined array if it doesn't exist
+  if (!meeting.declined) {
+    meeting.declined = [];
+  }
+  
+  // Remove from attendees if present
+  if (meeting.attendees) {
+    meeting.attendees = meeting.attendees.filter(email => email !== currentUser.email);
+  }
+  
+  // Check if they already declined, if so update reason, else add new record
+  const existingDecline = meeting.declined.find(d => d.email === currentUser.email);
+  if (existingDecline) {
+    existingDecline.reason = reason;
+    existingDecline.comments = comments;
+  } else {
+    meeting.declined.push({
+      email: currentUser.email,
+      name: currentUser.name,
+      reason: reason,
+      comments: comments,
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  const success = await DB._updateItem('meetings', meetingId, meeting);
+  if (success) {
+    closeModal();
+    toast('Meeting declined. Reason saved.', 'info');
+    await renderMeetings();
+  } else {
+    toast('Failed to submit decline', 'danger');
+  }
 }
 
 async function viewAttendance(id) {
@@ -567,13 +798,12 @@ async function viewAttendance(id) {
   const attendees = meeting.attendees || [];
   const declined = meeting.declined || [];
   
-  // Fetch all users so we can show names instead of just emails for attendees
   const users = await DB.users();
   
   const attendeeList = attendees.map(email => {
     const user = users.find(u => u.email === email);
     return `<li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
-      <i class="fas fa-check" style="color:var(--success);"></i> 
+      <i class="fas fa-check" style="color:var(--primary);"></i> 
       ${user ? user.name : email} 
       <span style="color:var(--text-muted); font-size:0.85rem;">(${email})</span>
     </li>`;
@@ -582,7 +812,7 @@ async function viewAttendance(id) {
   const declinedList = declined.map(d => `
     <li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
       <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
-        <strong><i class="fas fa-times" style="color:var(--danger);"></i> ${d.name}</strong>
+        <strong><i class="fas fa-times" style="color:#dc2626;"></i> ${d.name}</strong>
         <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(d.timestamp)}</span>
       </div>
       <div style="color:var(--text-muted); font-size:0.85rem;">${d.email}</div>
@@ -596,13 +826,13 @@ async function viewAttendance(id) {
     <h3><i class="fas fa-list"></i> Attendance: ${meeting.title}</h3>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
       <div class="card" style="background:var(--surface-alt);">
-        <div class="card-title" style="color:var(--success);">
+        <div class="card-title" style="color:var(--primary);">
           <i class="fas fa-check-circle"></i> Attending (${attendees.length})
         </div>
         <ul style="list-style:none; padding:0; margin:0;">${attendeeList}</ul>
       </div>
       <div class="card" style="background:var(--surface-alt);">
-        <div class="card-title" style="color:var(--danger);">
+        <div class="card-title" style="color:#dc2626;">
           <i class="fas fa-times-circle"></i> Declined (${declined.length})
         </div>
         <ul style="list-style:none; padding:0; margin:0;">${declinedList}</ul>
@@ -622,6 +852,8 @@ async function deleteMeeting(id) {
       toast('Failed to delete meeting', 'danger');
   }
 }
+
+// ============= MINUTES =============
 
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
@@ -670,6 +902,8 @@ async function showUploadMinutesModal() {
     }
   });
 }
+
+// ============= COMPLAINTS =============
 
 async function renderComplaints() {
   const complaints = getAllowedItems(await DB.complaints());
@@ -769,6 +1003,8 @@ async function deleteComplaint(id) {
   }
 }
 
+// ============= DOCUMENTS =============
+
 async function renderDocuments() {
   const documents = getAllowedItems(await DB.documents());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
@@ -853,6 +1089,8 @@ async function deleteDoc(id) {
   }
 }
 
+// ============= USERS =============
+
 async function renderUsers() {
   if (!isSystemAdmin(currentUser)) {
     render('<div class="card"><h2>Access Denied</h2></div>');
@@ -886,7 +1124,6 @@ async function renderUsers() {
   `);
 }
 
-// ============= TRACK USERS MODULE =============
 async function renderTrackUsers() {
   if (!isSystemAdmin(currentUser)) {
     render('<div class="card"><h2>Access Denied</h2><p>Only the Super Admin can track users.</p></div>');
@@ -904,7 +1141,6 @@ async function renderTrackUsers() {
       const lastSeenDate = new Date(user.last_seen);
       lastActive = formatDate(user.last_seen) + ' ' + lastSeenDate.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
       
-      // If seen in the last 3 minutes, they are Online
       const diffMs = now - lastSeenDate;
       const diffMins = Math.round(diffMs / 60000);
       
@@ -1068,8 +1304,9 @@ async function updateUser(id, userData) {
 }
 
 // ============= EMAIL MODULE =============
+
 async function renderEmails() {
-  const emails = getAllowedItems(await DB.emails());
+  const emails = getAllowedItems(await DB.emails(), 'municipality');
   emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   
   render(`
@@ -1110,28 +1347,14 @@ async function filterAndRenderEmails(filter) {
       filtered = allEmails.filter(e => e.from === currentUser.email);
       break;
     case 'unread':
-      filtered = allEmails.filter(e => !e.read && (e.to === currentUser.email || e.to === 'all'));
+      filtered = allEmails.filter(e => (e.to === currentUser.email || e.to === 'all') && !e.read);
       break;
-    default:
-      filtered = allEmails;
   }
   
-  filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  if (filtered.length === 0) return '<div class="card text-center text-muted">No emails found.</div>';
   
-  const emailList = byId('emailList');
-  if (!emailList) return '';
-  
-  emailList.innerHTML = filtered.length ? filtered.map(email => `
-    <div class="email-item" style="
-      border:1px solid var(--border);
-      border-radius:16px;
-      padding:1rem;
-      margin-bottom:0.75rem;
-      background:var(--surface);
-      cursor:pointer;
-      ${!email.read ? 'border-left:4px solid var(--primary);' : ''}
-      transition:background var(--transition);
-    " onclick="viewEmail(${email.id})">
+  return filtered.map(email => `
+    <div class="email-item" onclick="viewEmail(${email.id})">
       <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
           ${!email.read ? '<span style="color:var(--primary);font-size:0.6rem;"><i class="fas fa-circle"></i></span>' : ''}
@@ -1146,7 +1369,15 @@ async function filterAndRenderEmails(filter) {
         <span class="badge badge-info">${getMunicipalityLabel(email.municipality)}</span>
       </div>
     </div>
-  `).join('') : '<div class="card text-center text-muted">No emails found.</div>';
+  `).join('');
+}
+
+async function filterEmails(filter, event) {
+  if(event) {
+    qsa('.email-tabs .btn').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+  byId('emailList').innerHTML = await filterAndRenderEmails(filter);
 }
 
 async function viewEmail(id) {
@@ -1154,663 +1385,181 @@ async function viewEmail(id) {
   const email = emails.find(e => e.id === id);
   if (!email) return;
   
-  // Update read status in the database
-  if (!email.read) {
-      email.read = true;
-      const success = await DB._updateItem('emails', id, email);
-      if (!success) {
-          toast('Failed to mark as read', 'danger');
-      }
-  }
+  email.read = true;
+  await DB.setEmails(emails);
   
   showModal(`
     <h3><i class="fas fa-envelope-open"></i> ${email.subject}</h3>
     <div style="margin:1rem 0;padding:0.75rem;background:var(--surface-muted);border-radius:12px;">
       <div><strong>From:</strong> ${email.from}</div>
       <div><strong>To:</strong> ${email.to}</div>
-      <div><strong>Date:</strong> ${formatDate(email.timestamp)}</div>
-      <div><strong>Municipality:</strong> ${getMunicipalityLabel(email.municipality)}</div>
+      <div><strong>Date:</strong> ${formatDateTime(email.timestamp)}</div>
     </div>
-    <div style="margin:1rem 0;padding:1rem;border:1px solid var(--border);border-radius:12px;white-space:pre-wrap;">
-      ${email.body}
-    </div>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-      <button class="btn btn-danger btn-sm" onclick="deleteEmail(${email.id})">
-        <i class="fas fa-trash"></i> Delete
-      </button>
-      <button class="btn btn-outline btn-sm" onclick="closeModal();renderEmails();">
-        <i class="fas fa-arrow-left"></i> Back
-      </button>
+    <div style="line-height:1.6;white-space:pre-wrap;">${email.body}</div>
+    <div style="margin-top:2rem;text-align:right;">
+      <button class="btn btn-outline" onclick="closeModal()">Close</button>
     </div>
   `);
-}
-
-async function deleteEmail(id) {
-  if (!confirm('Delete this email?')) return;
-  const success = await DB._deleteItem('emails', id);
-  if (success) {
-      toast('Email deleted', 'success');
-      closeModal();
-      await renderEmails();
-  } else {
-      toast('Failed to delete email', 'danger');
-  }
 }
 
 async function showComposeEmailModal() {
-  const users = await DB.users();
-  const recipients = users.filter(u => u.email !== currentUser.email);
-  
+  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   showModal(`
-    <h3><i class="fas fa-pencil-alt"></i> Compose Email</h3>
+    <h3><i class="fas fa-pen"></i> Compose Email</h3>
     <form id="composeEmailForm">
       <div class="form-group">
         <label>To</label>
-        <select id="emailTo" required>
-          <option value="">Select recipient...</option>
-          ${recipients.map(u => `<option value="${u.email}">${u.name} (${u.email})</option>`).join('')}
-          <option value="all">All Users</option>
+        <select id="emailTo">
+          <option value="all">All Municipalities</option>
+          ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group">
-        <label>Subject</label>
-        <input type="text" id="emailSubject" required placeholder="Enter subject..." />
-      </div>
-      <div class="form-group">
-        <label>Message</label>
-        <textarea id="emailBody" rows="6" required placeholder="Write your message..."></textarea>
-      </div>
-      <button type="submit" class="btn btn-primary btn-block">
-        <i class="fas fa-paper-plane"></i> Send
-      </button>
+      <div class="form-group"><label>Subject</label><input type="text" id="emailSubject" required /></div>
+      <div class="form-group"><label>Message</label><textarea id="emailBody" rows="6" required></textarea></div>
+      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send</button>
     </form>
   `);
-  
-  byId('composeEmailForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
+  byId('composeEmailForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
     const to = byId('emailTo').value;
     const subject = byId('emailSubject').value.trim();
     const body = byId('emailBody').value.trim();
     
-    if (!to || !subject || !body) {
-      toast('Please complete all fields', 'danger');
-      return;
-    }
+    const newEmail = await DB.addEmail({
+      from: currentUser.email,
+      to: to,
+      subject: subject,
+      body: body,
+      timestamp: new Date().toISOString(),
+      read: false,
+      municipality: to === 'all' ? 'all' : currentUser.municipality
+    });
     
-    // Logic for sending to 'all'
-    if (to === 'all') {
-        const users = await DB.users();
-        for (const user of users) {
-            if (user.email !== currentUser.email) {
-                await DB.addEmail({
-                    from: currentUser.email,
-                    to: user.email,
-                    subject: subject,
-                    body: body,
-                    timestamp: new Date().toISOString(),
-                    read: false,
-                    municipality: currentUser.municipality === 'all' ? 'all' : currentUser.municipality
-                });
-            }
-        }
+    if(newEmail) {
+      closeModal();
+      toast('Email sent successfully', 'success');
+      navigate('emails');
     } else {
-        // Send to a single recipient
-        await DB.addEmail({
-            from: currentUser.email,
-            to: to,
-            subject: subject,
-            body: body,
-            timestamp: new Date().toISOString(),
-            read: false,
-            municipality: currentUser.municipality === 'all' ? 'all' : currentUser.municipality
-        });
+      toast('Failed to send email', 'danger');
     }
-    
-    closeModal();
-    toast('Email sent successfully', 'success');
-    await renderEmails();
   });
 }
 
-async function filterEmails(filter, event) {
-  if (event && event.target) {
-    document.querySelectorAll('.email-tabs .btn').forEach(btn => btn.classList.remove('active'));
-    event.target.closest('.btn').classList.add('active');
-  }
-  
-  await filterAndRenderEmails(filter);
-}
-
 // ============= BROADCAST MODULE =============
+
 async function renderBroadcasts() {
-  const broadcasts = getAllowedItems(await DB.broadcasts());
+  const broadcasts = await DB.broadcasts();
   broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  
-  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer';
+  const canAdd = isSystemAdmin(currentUser) || currentUser.role === 'municipal_officer';
   
   render(`
     <div class="page-header">
       <h2><i class="fas fa-bullhorn"></i> Announcements</h2>
-      ${isAdmin ? `
-        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
-          <i class="fas fa-plus"></i> New Broadcast
-        </button>
-      ` : ''}
+      ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showBroadcastModal()"><i class="fas fa-plus"></i> New Announcement</button>' : ''}
     </div>
-    
-    ${isAdmin ? `
-      <div class="card" style="background:var(--surface-alt);border:2px dashed var(--border);">
-        <div class="card-title"><i class="fas fa-bullhorn"></i> Admin Broadcast</div>
-        <p style="color:var(--text-muted);margin-bottom:1rem;">
-          Send a message that will be visible to all users on their dashboard.
-        </p>
-        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
-          <i class="fas fa-bullhorn"></i> Create Broadcast
-        </button>
-      </div>
-    ` : ''}
-    
-    <div class="broadcast-list">
-      ${broadcasts.length ? broadcasts.map(b => `
-        <div class="broadcast-item card" style="
-          border-left:4px solid var(--primary);
-          ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? 'background:var(--surface-alt);' : ''}
-        ">
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+      ${broadcasts.map(b => `
+        <div class="card broadcast-item">
           <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-            <strong style="color:var(--primary-dark);">
-              <i class="fas fa-bullhorn"></i> ${b.sender}
-            </strong>
-            <span style="color:var(--text-muted);font-size:0.85rem;">
-              ${formatDate(b.timestamp)}
-            </span>
+            <strong style="font-size:1.1rem;">${b.message}</strong>
+            <span style="color:var(--text-muted);font-size:0.85rem;">${formatDateTime(b.timestamp)}</span>
           </div>
-          <div style="margin-top:0.75rem;font-size:1.05rem;padding:0.5rem 0;">
-            ${b.message}
+          <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">
+            From: <strong>${b.sender}</strong> • To: ${getMunicipalityLabel(b.municipality)}
           </div>
-          <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.85rem;">
-            ${getMunicipalityLabel(b.municipality)}
-            ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? ' • <span style="color:var(--primary);font-weight:600;">New</span>' : ''}
-          </div>
-          ${isAdmin ? `
-            <div style="margin-top:0.75rem;">
-              <button class="btn btn-danger btn-sm" onclick="deleteBroadcast(${b.id})">
-                <i class="fas fa-trash"></i> Delete
-              </button>
-            </div>
-          ` : ''}
         </div>
-      `).join('') : '<div class="card text-center text-muted">No announcements available.</div>'}
+      `).join('')}
     </div>
   `);
 }
 
 async function showBroadcastModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
-  
   showModal(`
-    <h3><i class="fas fa-bullhorn"></i> Create Broadcast</h3>
+    <h3><i class="fas fa-bullhorn"></i> New Announcement</h3>
     <form id="broadcastForm">
       <div class="form-group">
         <label>Message</label>
-        <textarea id="broadcastMessage" rows="5" required 
-          placeholder="Type your announcement here. This will be visible to all users in the selected municipality..."></textarea>
+        <textarea id="broadcastMessage" rows="4" required placeholder="Type your announcement here..."></textarea>
       </div>
       <div class="form-group">
-        <label>Municipality</label>
-        <select id="broadcastMunicipality">
-            ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
+        <label>Target Audience</label>
+        <select id="broadcastMuni">
+          ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
         </select>
       </div>
-      <button type="submit" class="btn btn-primary btn-block">
-        <i class="fas fa-bullhorn"></i> Create Broadcast
-      </button>
+      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Broadcast</button>
     </form>
   `);
-  
-  byId('broadcastForm').addEventListener('submit', async function (event) {
-    event.preventDefault();
+  byId('broadcastForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
     const message = byId('broadcastMessage').value.trim();
-    const municipality = byId('broadcastMunicipality').value;
-    
-    if (!message) { toast('Please enter a message', 'danger'); return; }
+    const municipality = byId('broadcastMuni').value;
     
     const newBroadcast = await DB.addBroadcast({
-        message: message,
-        sender: currentUser.name,
-        timestamp: new Date().toISOString(),
-        municipality: municipality
+      message: message,
+      sender: currentUser.name,
+      timestamp: new Date().toISOString(),
+      municipality: municipality
     });
     
-    if (newBroadcast) {
-        closeModal();
-        toast('Broadcast created successfully', 'success');
-        await renderBroadcasts();
+    if(newBroadcast) {
+      closeModal();
+      toast('Announcement posted', 'success');
+      navigate('broadcasts');
     } else {
-        toast('Failed to create broadcast', 'danger');
+      toast('Failed to post announcement', 'danger');
     }
   });
 }
 
-async function deleteBroadcast(id) {
-  if (!confirm('Delete this broadcast?')) return;
-  const success = await DB._deleteItem('broadcasts', id);
-  if (success) {
-      toast('Broadcast deleted', 'success');
-      await renderBroadcasts();
-  } else {
-      toast('Failed to delete broadcast', 'danger');
-  }
-}
+// ============= HELPER UI FUNCTIONS =============
 
-// ============= SHARED FUNCTIONS =============
 function showModal(content) {
-  let overlay = byId('modalOverlay');
-  // If the overlay doesn't exist on the page (e.g. login page), create it dynamically
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'modalOverlay';
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal-box" id="modalBox">
-        <button class="close-modal" id="modalClose">&times;</button>
-        <div id="modalBody"></div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
+    let overlay = byId('modalOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'modalOverlay';
+        overlay.className = 'modal-overlay';
+        document.body.appendChild(overlay);
+    }
     
-    // Attach listeners for the dynamically created modal
-    byId('modalClose').addEventListener('click', closeModal);
-    overlay.addEventListener('click', event => {
-      if (event.target === event.currentTarget) closeModal();
-    });
-  }
-  
-  const body = byId('modalBody');
-  if (body) body.innerHTML = content;
-  overlay.classList.add('active');
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    box.innerHTML = `
+        <button class="close-modal" onclick="closeModal()">&times;</button>
+        <div id="modalBody">${content}</div>
+    `;
+    
+    overlay.innerHTML = '';
+    overlay.appendChild(box);
+    overlay.classList.add('active');
 }
 
 function closeModal() {
-  const overlay = byId('modalOverlay');
-  if (overlay) overlay.classList.remove('active');
+    const overlay = byId('modalOverlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+        setTimeout(() => { if(overlay) overlay.innerHTML = ''; }, 300);
+    }
 }
 
 function toast(message, type = 'info') {
-  const node = document.createElement('div');
-  node.className = `alert alert-${type}`;
-  node.textContent = message;
-  node.style.position = 'fixed';
-  node.style.right = '20px';
-  node.style.top = '80px';
-  node.style.zIndex = '3000';
-  document.body.appendChild(node);
-  setTimeout(() => node.remove(), 3200);
-}
-
-function setTextSize(value) {
-  document.documentElement.style.fontSize = value;
-  localStorage.setItem('mbp_textSize', value);
-}
-
-function setSpacing(mode) {
-  document.body.classList.remove('spacing-compact', 'spacing-relaxed');
-  if (mode) document.body.classList.add(mode);
-  localStorage.setItem('mbp_spacing', mode || '');
-}
-
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme') || 'light';
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('mbp_theme', next);
-  const btn = byId('aThemeToggle');
-  if (btn) btn.innerHTML = next === 'dark' ? '<i class="fas fa-sun"></i> Theme' : '<i class="fas fa-moon"></i> Theme';
-  toast(`Switched to ${next} mode`, 'info');
-}
-
-function speakText() {
-  if (!window.speechSynthesis) { toast('Text to speech is unavailable', 'danger'); return; }
-  const container = byId('pageContainer');
-  if (!container) { toast('Nothing to speak', 'info'); return; }
-  const text = container.innerText.trim();
-  if (!text) { toast('Nothing to speak', 'info'); return; }
-  stopSpeech();
-  speechUtterance = new SpeechSynthesisUtterance(text);
-  speechUtterance.rate = 0.9;
-  speechUtterance.pitch = 1;
-  speechUtterance.lang = 'en-US';
-  speechUtterance.onstart = () => { const indicator = byId('speechIndicator'); if (indicator) indicator.classList.add('active'); };
-  speechUtterance.onend = () => { const indicator = byId('speechIndicator'); if (indicator) indicator.classList.remove('active'); };
-  speechUtterance.onerror = () => { const indicator = byId('speechIndicator'); if (indicator) indicator.classList.remove('active'); };
-  window.speechSynthesis.speak(speechUtterance);
-}
-
-function stopSpeech() {
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
-  const indicator = byId('speechIndicator');
-  if (indicator) indicator.classList.remove('active');
-}
-
-function resetAccessibility() {
-  setTextSize('16px');
-  setSpacing('');
-  stopSpeech();
-  const theme = localStorage.getItem('mbp_theme') || 'light';
-  document.documentElement.setAttribute('data-theme', theme);
-  toast('Accessibility reset', 'info');
-}
-
-function bindAccessibility() {
-  const actions = {
-    aTextSmall: () => setTextSize('14px'),
-    aTextDefault: () => setTextSize('16px'),
-    aTextLarge: () => setTextSize('20px'),
-    aTextXlarge: () => setTextSize('24px'),
-    aSpacingCompact: () => setSpacing('spacing-compact'),
-    aSpacingRelaxed: () => setSpacing('spacing-relaxed'),
-    aSpeech: speakText,
-    aThemeToggle: toggleTheme,
-    aReset: resetAccessibility
-  };
-  Object.entries(actions).forEach(([id, fn]) => {
-    const btn = byId(id);
-    if (btn) btn.addEventListener('click', fn);
-  });
-  const stop = byId('speechStop');
-  if (stop) stop.addEventListener('click', stopSpeech);
-}
-
-function attachHomeNavigation() {
-  qsa('.sidebar .nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const page = item.dataset.page;
-      if (page) navigate(page);
-    });
-  });
-}
-
-async function boot() {
-  await seedData(); 
-  bindAccessibility();
-  const savedText = localStorage.getItem('mbp_textSize');
-  if (savedText) setTextSize(savedText);
-  const savedSpacing = localStorage.getItem('mbp_spacing');
-  if (savedSpacing) setSpacing(savedSpacing);
-  const savedTheme = localStorage.getItem('mbp_theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  const themeBtn = byId('aThemeToggle');
-  if (themeBtn && savedTheme === 'dark') themeBtn.innerHTML = '<i class="fas fa-sun"></i> Theme';
-
-  const page = document.body.dataset.page;
-  if (page === 'login') {
-    if (await restoreSession()) {
-      window.location.href = 'home.html';
-      return;
-    }
-    const form = byId('loginForm');
-    if (form) {
-      form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        const email = byId('loginEmail').value.trim();
-        const password = byId('loginPassword').value.trim();
-        if (await login(email, password)) {
-          byId('loginError').style.display = 'none';
-          window.location.href = 'home.html';
-        } else {
-          byId('loginError').style.display = 'block';
-        }
-      });
+    let container = byId('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:3000;display:flex;flex-direction:column;gap:10px;';
+        document.body.appendChild(container);
     }
     
-    const formContainer = byId('loginForm')?.parentElement;
-    if (formContainer) {
-        const regLink = document.createElement('p');
-        regLink.innerHTML = '<a href="#" id="showRegisterLink" style="color:var(--primary); font-weight:500;">Not a member? Create an account</a>';
-        regLink.style.textAlign = 'center';
-        regLink.style.marginTop = '1.5rem';
-        formContainer.appendChild(regLink);
-        
-        byId('showRegisterLink').addEventListener('click', function(e) {
-            e.preventDefault();
-            showRegisterModal();
-        });
-    }
-    return;
-  }
-
-  if (!(await restoreSession())) {
-    window.location.href = 'index.html';
-    return;
-  }
-
-  showAppInfo();
-  const logoutButton = byId('logoutBtn');
-  if (logoutButton) logoutButton.addEventListener('click', logout);
-  if (page === 'home') {
-    attachHomeNavigation();
-    byId('modalClose')?.addEventListener('click', closeModal);
-    byId('modalOverlay')?.addEventListener('click', event => {
-      if (event.target === event.currentTarget) closeModal();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closeModal();
-      if (event.ctrlKey && event.key.toLowerCase() === 'l') { event.preventDefault(); logout(); }
-    });
+    const el = document.createElement('div');
+    el.className = `alert alert-${type}`;
+    el.innerHTML = message;
+    container.appendChild(el);
     
-    // --- HEARTBEAT TIMER ---
-    // Tell the backend this user is still active every 60 seconds
-    setInterval(async () => {
-      if (currentUser && currentUser.id) {
-        try {
-          await fetch(`${API_BASE_URL}/heartbeat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: currentUser.id })
-          });
-        } catch (e) { console.error('Heartbeat failed'); }
-      }
-    }, 60000); // 60,000 ms = 1 minute
-
-    navigate('dashboard');
-  }
-  if (page === 'settings') {
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closeModal();
-      if (event.ctrlKey && event.key.toLowerCase() === 'l') { event.preventDefault(); logout(); }
-    });
-  }
+    setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+    }, 3000);
 }
-
-// ============= REGISTRATION & OAUTH MODULE =============
-function showRegisterModal() {
-    closeModal();
-    showModal(`
-    <h3><i class="fas fa-user-plus"></i> Create Account</h3>
-    
-    <div style="margin-bottom: 1.5rem;">
-        <button class="btn btn-outline btn-block" style="margin-bottom:0.5rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;" onclick="loginWithGoogle()">
-            <i class="fab fa-google" style="color:#db4a39;"></i> Continue with Google
-        </button>
-        <button class="btn btn-outline btn-block" style="display:flex; align-items:center; justify-content:center; gap:0.5rem;" onclick="loginWithMicrosoft()">
-            <i class="fab fa-microsoft" style="color:#00a4ef;"></i> Continue with Microsoft
-        </button>
-        <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin: 1rem 0; position:relative;">
-            <span style="background:var(--surface); padding:0 10px; position:relative; z-index:1;">OR</span>
-            <span style="position:absolute; top:50%; left:0; right:0; height:1px; background:var(--border); z-index:0;"></span>
-        </p>
-    </div>
-
-    <form id="registerForm">
-      <div class="form-group"><label>Full Name</label><input type="text" id="rName" required /></div>
-      <div class="form-group"><label>Email</label><input type="email" id="rEmail" required /></div>
-      <div class="form-group"><label>Municipality</label><select id="rMunicipality">
-          <option value="kenol">Kenol</option>
-          <option value="kangare">Kangare</option>
-          <option value="muranga_town">Murang'a Town</option>
-      </select></div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="rPassword" required oninput="checkPasswordStrength()" style="border-radius: 14px; border: 1px solid var(--border);" />
-        <div id="passwordFeedback" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; padding: 0.75rem; background: var(--surface-alt); border-radius: 8px; line-height: 1.4;">
-          <strong style="display:block; margin-bottom:0.25rem;">Password Requirements:</strong>
-          • At least 8 characters<br>
-          • At least 1 uppercase letter (A-Z)<br>
-          • At least 1 lowercase letter (a-z)<br>
-          • At least 1 number (0-9)<br>
-          • At least 1 special character (!@#$%^&*)
-        </div>
-      </div>
-      <div class="form-group"><label>Confirm Password</label><input type="password" id="rConfirmPassword" required oninput="checkPasswordMatch()" style="border-radius: 14px; border: 1px solid var(--border);" /></div>
-      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Register</button>
-    </form>
-    `);
-    
-    byId('registerForm').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        const name = byId('rName').value.trim();
-        const email = byId('rEmail').value.trim();
-        const password = byId('rPassword').value.trim();
-        const confirmPassword = byId('rConfirmPassword').value.trim();
-        const municipality = byId('rMunicipality').value;
-        
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-        if (!passwordRegex.test(password)) {
-            toast('Password does not meet security requirements', 'danger');
-            return;
-        }
-        
-        if (password !== confirmPassword) {
-            toast('Passwords do not match', 'danger');
-            return;
-        }
-        
-        try {
-            const newUser = await DB.registerUser({ name, email, password, municipality });
-            closeModal();
-            toast('Registration successful! Please login.', 'success');
-        } catch (error) {
-            toast(error.message, 'danger');
-        }
-    });
-}
-
-function checkPasswordStrength() {
-    const passwordInput = byId('rPassword');
-    if (!passwordInput) return;
-    const password = passwordInput.value;
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-    
-    if (password.length === 0) {
-        passwordInput.style.border = '1px solid var(--border)';
-    } else if (passwordRegex.test(password)) {
-        passwordInput.style.border = '2px solid var(--success, #28a745)';
-    } else {
-        passwordInput.style.border = '2px solid var(--danger, #dc3545)';
-    }
-    
-    // Also check match if confirm has value
-    if (byId('rConfirmPassword')?.value.length > 0) {
-        checkPasswordMatch();
-    }
-}
-
-function checkPasswordMatch() {
-    const passwordInput = byId('rPassword');
-    const confirmInput = byId('rConfirmPassword');
-    if (!passwordInput || !confirmInput) return;
-    
-    if (confirmInput.value.length === 0) {
-        confirmInput.style.border = '1px solid var(--border)';
-    } else if (passwordInput.value === confirmInput.value) {
-        confirmInput.style.border = '2px solid var(--success, #28a745)';
-    } else {
-        confirmInput.style.border = '2px solid var(--danger, #dc3545)';
-    }
-}
-
-async function loginWithGoogle() {
-    loginWithOAuth('Google', 'google');
-}
-
-async function loginWithMicrosoft() {
-    loginWithOAuth('Microsoft', 'microsoft');
-}
-
-async function loginWithOAuth(providerName, providerId) {
-    closeModal();
-    showModal(`
-        <h3><i class="fab fa-${providerId}"></i> Continue with ${providerName}</h3>
-        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1rem;">
-            This is a simulated ${providerName} login for local development. Enter your name and email to continue.
-        </p>
-        <form id="oauthForm">
-            <div class="form-group"><label>Name</label><input type="text" id="oName" required /></div>
-            <div class="form-group"><label>Email</label><input type="email" id="oEmail" required /></div>
-            <button type="submit" class="btn btn-primary btn-block">Continue</button>
-        </form>
-    `);
-    
-    byId('oauthForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const name = byId('oName').value.trim();
-        const email = byId('oEmail').value.trim();
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}/oauth-login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, provider: providerName })
-            });
-            if (response.ok) {
-                currentUser = await response.json();
-                localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
-                window.location.href = 'home.html';
-            } else {
-                toast(`${providerName} login failed`, 'danger');
-            }
-        } catch (err) {
-            toast('An error occurred', 'danger');
-        }
-    });
-}
-
-window.navigate = navigate;
-window.showAddMemberModal = showAddMemberModal;
-window.deleteMember = deleteMember;
-window.showScheduleMeetingModal = showScheduleMeetingModal;
-window.confirmAttendance = confirmAttendance;
-window.showDeclineModal = showDeclineModal;
-window.viewAttendance = viewAttendance;
-window.deleteMeeting = deleteMeeting;
-window.showUploadMinutesModal = showUploadMinutesModal;
-window.showAddComplaintModal = showAddComplaintModal;
-window.assignComplaint = assignComplaint;
-window.updateComplaintStatus = updateComplaintStatus;
-window.deleteComplaint = deleteComplaint;
-window.showUploadDocModal = showUploadDocModal;
-window.downloadDoc = downloadDoc;
-window.deleteDoc = deleteDoc;
-window.showAddUserModal = showAddUserModal;
-window.deleteUser = deleteUser;
-window.toggleTheme = toggleTheme;
-window.stopSpeech = stopSpeech;
-window.speakText = speakText;
-window.resetAccessibility = resetAccessibility;
-window.closeModal = closeModal;
-window.toast = toast;
-window.editUser = editUser;
-window.updateUser = updateUser;
-window.renderEmails = renderEmails;
-window.viewEmail = viewEmail;
-window.deleteEmail = deleteEmail;
-window.showComposeEmailModal = showComposeEmailModal;
-window.filterEmails = filterEmails;
-window.renderBroadcasts = renderBroadcasts;
-window.showBroadcastModal = showBroadcastModal;
-window.deleteBroadcast = deleteBroadcast;
-window.renderTrackUsers = renderTrackUsers;
-window.loginWithGoogle = loginWithGoogle;
-window.loginWithMicrosoft = loginWithMicrosoft;
-window.checkPasswordStrength = checkPasswordStrength;
-window.checkPasswordMatch = checkPasswordMatch;
-window.addEventListener('DOMContentLoaded', boot);
