@@ -224,7 +224,6 @@ function showAppInfo() {
   const usersNav = byId('navUsers');
   if (usersNav) usersNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
   
-  // Show Track Users link only for Super Admin
   const trackNav = byId('navTrack');
   if (trackNav) trackNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
 }
@@ -417,10 +416,13 @@ async function deleteMember(id) {
   }
 }
 
-// ============= MEETINGS =============
+// ============= MEETING FUNCTIONS =============
+
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  
+  meetings.sort((a, b) => new Date(a.date) - new Date(b.date));
   
   render(`
     <div class="page-header">
@@ -431,37 +433,64 @@ async function renderMeetings() {
       ${meetings.length ? meetings.map(meeting => {
         const isAttending = meeting.attendees && meeting.attendees.includes(currentUser.email);
         const isDeclined = meeting.declined && meeting.declined.find(d => d.email === currentUser.email);
-        const declineReason = isDeclined ? isDeclined.reason : null;
-        const declineComments = isDeclined ? (isDeclined.comments || '') : null;
-
+        const attendeesCount = meeting.attendees ? meeting.attendees.length : 0;
+        const declinedCount = meeting.declined ? meeting.declined.length : 0;
+        const isUpcoming = new Date(meeting.date) >= new Date();
+        
         return `
-        <div class="card">
+        <div class="card" style="${isUpcoming ? '' : 'opacity:0.7;'}">
           <div class="flex-between" style="display:flex;justify-content:space-between;align-items:start;gap:0.75rem;flex-wrap:wrap;">
-            <strong>${meeting.title}</strong>
-            <span class="badge ${meeting.status === 'scheduled' ? 'badge-info' : meeting.status === 'resolved' ? 'badge-success' : 'badge-warning'}">${meeting.status}</span>
+            <strong style="font-size:1.05rem;">${meeting.title}</strong>
+            <span class="badge ${meeting.status === 'scheduled' ? 'badge-info' : meeting.status === 'resolved' ? 'badge-success' : 'badge-warning'}">
+              ${meeting.status}
+            </span>
           </div>
-          <div style="margin:0.65rem 0;color:var(--text-muted);font-size:0.95rem;"><i class="fas fa-calendar-day"></i> ${formatDate(meeting.date)} at ${meeting.time}</div>
-          <div style="color:var(--text-muted);font-size:0.95rem;"><i class="fas fa-map-marker-alt"></i> ${meeting.location}</div>
-          <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;">
-            <i class="fas fa-users"></i> ${meeting.attendees ? meeting.attendees.length : 0} attending
-            ${meeting.declined && meeting.declined.length > 0 ? ` • <i class="fas fa-times-circle" style="color:#dc2626;"></i> ${meeting.declined.length} declined` : ''}
+          <div style="margin:0.65rem 0;color:var(--text-muted);font-size:0.95rem;">
+            <i class="fas fa-calendar-day"></i> ${formatDate(meeting.date)} at ${meeting.time}
+          </div>
+          <div style="color:var(--text-muted);font-size:0.95rem;">
+            <i class="fas fa-map-marker-alt"></i> ${meeting.location}
+          </div>
+          <div style="margin-top:0.85rem;color:var(--text-muted);font-size:0.9rem;display:flex;gap:1rem;flex-wrap:wrap;">
+            <span><i class="fas fa-check-circle" style="color:var(--success);"></i> ${attendeesCount} attending</span>
+            ${declinedCount > 0 ? `<span><i class="fas fa-times-circle" style="color:var(--danger);"></i> ${declinedCount} declined</span>` : ''}
           </div>
           ${isDeclined ? `
             <div style="margin-top:0.65rem;padding:0.6rem 0.85rem;background:rgba(220,38,38,0.08);border-left:3px solid #dc2626;border-radius:8px;font-size:0.9rem;">
-              <strong><i class="fas fa-times-circle" style="color:#dc2626;"></i> You declined:</strong> ${declineReason}
-              ${declineComments ? `<br /><span style="font-size:0.8rem;color:var(--text-muted);">Comments: ${declineComments}</span>` : ''}
+              <strong><i class="fas fa-times-circle" style="color:#dc2626;"></i> You declined:</strong> ${isDeclined.reason}
+              ${isDeclined.comments ? `<br /><span style="font-size:0.8rem;color:var(--text-muted);">📝 ${isDeclined.comments}</span>` : ''}
             </div>
           ` : ''}
           <div class="actions" style="margin-top:0.85rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
             ${!isAttending && !isDeclined ? `
-              <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})"><i class="fas fa-check"></i> Attend</button>
-              <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})"><i class="fas fa-times"></i> Decline</button>
+              <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})">
+                <i class="fas fa-check"></i> Attend
+              </button>
+              <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})">
+                <i class="fas fa-times"></i> Decline
+              </button>
             ` : ''}
             ${isAttending ? `
-              <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})"><i class="fas fa-times"></i> Cancel Attendance</button>
+              <button class="btn btn-warning btn-sm" onclick="showDeclineModal(${meeting.id})">
+                <i class="fas fa-exchange-alt"></i> Switch to Decline
+              </button>
             ` : ''}
-            ${canAdd ? `<button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})"><i class="fas fa-list"></i> View Attendance</button>` : ''}
-            ${canAdd ? `<button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})"><i class="fas fa-trash"></i></button>` : ''}
+            ${isDeclined ? `
+              <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})">
+                <i class="fas fa-check"></i> Change to Attend
+              </button>
+            ` : ''}
+            ${canAdd ? `
+              <button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})">
+                <i class="fas fa-list"></i> View Attendance
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})">
+                <i class="fas fa-trash"></i>
+              </button>
+            ` : ''}
+          </div>
+          <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted);">
+            ${getMunicipalityLabel(meeting.municipality)}
           </div>
         </div>
       `}).join('') : '<div class="card text-center text-muted">No meetings scheduled yet.</div>'}
@@ -504,62 +533,67 @@ async function showScheduleMeetingModal() {
 async function confirmAttendance(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
-  if (!meeting) return;
-
-  if (!meeting.attendees.includes(currentUser.email)) {
-    meeting.attendees.push(currentUser.email);
+  if (!meeting) {
+    toast('Meeting not found', 'danger');
+    return;
   }
-  
-  // Remove from declined list if previously declined
+
   if (meeting.declined && meeting.declined.some(d => d.email === currentUser.email)) {
     meeting.declined = meeting.declined.filter(d => d.email !== currentUser.email);
   }
 
+  if (!meeting.attendees.includes(currentUser.email)) {
+    meeting.attendees.push(currentUser.email);
+  }
+
   const success = await DB._updateItem('meetings', id, meeting);
   if (success) {
-    toast('Attendance confirmed', 'success');
+    toast('You are now attending this meeting ✅', 'success');
   } else {
     toast('Failed to confirm attendance', 'danger');
   }
   await renderMeetings();
 }
 
-// Decline modal with reason selector (from app.js) + backend persistence
 async function showDeclineModal(meetingId) {
-  // Check current state
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === meetingId);
-  if (!meeting) { toast('Meeting not found', 'danger'); return; }
-
-  const existingDecline = meeting.declined ? meeting.declined.find(d => d.email === currentUser.email) : null;
-  if (existingDecline) {
-    toast('You have already declined this meeting', 'info');
+  if (!meeting) {
+    toast('Meeting not found', 'danger');
     return;
   }
 
+  const isAttending = meeting.attendees && meeting.attendees.includes(currentUser.email);
+  const existingDecline = meeting.declined ? meeting.declined.find(d => d.email === currentUser.email) : null;
+
   showModal(`
-    <h3><i class="fas fa-times-circle"></i> Decline Meeting</h3>
-    <p style="color: var(--text-muted); margin-bottom: 1rem;">Please provide a reason for not attending this meeting.</p>
+    <h3><i class="fas fa-times-circle" style="color: var(--danger);"></i> 
+      ${existingDecline ? 'Update Decline Reason' : 'Decline Meeting'}</h3>
+    <p style="color: var(--text-muted); margin-bottom: 1rem;">
+      ${isAttending ? 'You are currently attending this meeting. Declining will remove you from the attendee list.' : 
+        existingDecline ? 'Update your reason for declining this meeting.' : 
+        'Please provide a reason for not attending this meeting.'}
+    </p>
     <form id="declineForm">
       <div class="form-group">
         <label>Reason for Declining</label>
         <select id="declineReason" required>
           <option value="">Select a reason...</option>
-          <option value="Schedule Conflict">Schedule Conflict</option>
-          <option value="Prior Commitment">Prior Commitment</option>
-          <option value="Travel Constraints">Travel Constraints</option>
-          <option value="Health Reasons">Health Reasons</option>
-          <option value="Emergency">Emergency</option>
-          <option value="Other">Other</option>
+          <option value="Schedule Conflict" ${existingDecline?.reason === 'Schedule Conflict' ? 'selected' : ''}>Schedule Conflict</option>
+          <option value="Prior Commitment" ${existingDecline?.reason === 'Prior Commitment' ? 'selected' : ''}>Prior Commitment</option>
+          <option value="Travel Constraints" ${existingDecline?.reason === 'Travel Constraints' ? 'selected' : ''}>Travel Constraints</option>
+          <option value="Health Reasons" ${existingDecline?.reason === 'Health Reasons' ? 'selected' : ''}>Health Reasons</option>
+          <option value="Emergency" ${existingDecline?.reason === 'Emergency' ? 'selected' : ''}>Emergency</option>
+          <option value="Other" ${existingDecline?.reason === 'Other' ? 'selected' : ''}>Other</option>
         </select>
       </div>
       <div class="form-group">
         <label>Additional Comments (Optional)</label>
-        <textarea id="declineComments" rows="3" placeholder="Provide more details about why you can't attend..."></textarea>
+        <textarea id="declineComments" rows="3" placeholder="Provide more details about why you can't attend...">${existingDecline?.comments || ''}</textarea>
       </div>
       <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-        <button type="submit" class="btn btn-danger">
-          <i class="fas fa-times"></i> Decline Meeting
+        <button type="submit" class="btn btn-${isAttending ? 'warning' : 'danger'}">
+          <i class="fas fa-times"></i> ${isAttending ? 'Cancel Attendance & Decline' : 'Decline Meeting'}
         </button>
         <button type="button" class="btn btn-outline" onclick="closeModal()">
           <i class="fas fa-arrow-left"></i> Cancel
@@ -573,19 +607,22 @@ async function showDeclineModal(meetingId) {
     const reason = byId('declineReason').value;
     const comments = byId('declineComments').value.trim();
 
-    if (!reason) { toast('Please select a reason', 'danger'); return; }
+    if (!reason) {
+      toast('Please select a reason', 'danger');
+      return;
+    }
 
-    // Re-fetch to get latest state
     const freshMeetings = await DB.meetings();
     const freshMeeting = freshMeetings.find(item => item.id === meetingId);
-    if (!freshMeeting) { toast('Meeting not found', 'danger'); return; }
+    if (!freshMeeting) {
+      toast('Meeting not found', 'danger');
+      return;
+    }
 
     if (!freshMeeting.declined) freshMeeting.declined = [];
 
-    // Remove from attendees if currently attending
     freshMeeting.attendees = freshMeeting.attendees.filter(email => email !== currentUser.email);
 
-    // Update or add decline record
     const existingIdx = freshMeeting.declined.findIndex(d => d.email === currentUser.email);
     const declineRecord = {
       email: currentUser.email,
@@ -594,6 +631,7 @@ async function showDeclineModal(meetingId) {
       comments: comments || '',
       timestamp: new Date().toISOString()
     };
+    
     if (existingIdx >= 0) {
       freshMeeting.declined[existingIdx] = declineRecord;
     } else {
@@ -603,13 +641,15 @@ async function showDeclineModal(meetingId) {
     const success = await DB._updateItem('meetings', meetingId, freshMeeting);
     if (success) {
       closeModal();
-      toast('Meeting declined. Reason saved.', 'info');
+      toast(isAttending ? 'Attendance cancelled and meeting declined.' : 'Meeting declined. Reason saved.', 'info');
       await renderMeetings();
     } else {
       toast('Failed to submit decline', 'danger');
     }
   });
 }
+
+// ============= ENHANCED VIEW ATTENDANCE =============
 
 async function viewAttendance(id) {
   const meetings = await DB.meetings();
@@ -618,61 +658,488 @@ async function viewAttendance(id) {
 
   const attendees = meeting.attendees || [];
   const declined = meeting.declined || [];
-  
   const users = await DB.users();
+  const members = await DB.members();
+  
+  const getUserRole = (email) => {
+    const user = users.find(u => u.email === email);
+    if (user) return getRoleLabel(user.role);
+    const member = members.find(m => m.email === email);
+    return member ? getRoleLabel(member.role) : 'Member';
+  };
   
   const attendeeList = attendees.map(email => {
     const user = users.find(u => u.email === email);
-    return `<li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
-      <i class="fas fa-check" style="color:var(--success);"></i> 
-      ${user ? user.name : email} 
-      <span style="color:var(--text-muted); font-size:0.85rem;">(${email})</span>
-    </li>`;
+    const name = user ? user.name : email;
+    const role = getUserRole(email);
+    return `
+      <li style="padding:0.5rem 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span>
+          <i class="fas fa-check-circle" style="color:var(--success);"></i> 
+          <strong>${name}</strong>
+        </span>
+        <span style="color:var(--text-muted); font-size:0.85rem;">
+          <span class="badge badge-info">${role}</span>
+          <span style="margin-left:0.5rem;">${email}</span>
+        </span>
+      </li>
+    `;
   }).join('') || '<li style="padding:0.5rem 0; color:var(--text-muted);">No one has confirmed attendance yet.</li>';
 
-  const declinedList = declined.map(d => `
-    <li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
-      <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
-        <strong><i class="fas fa-times" style="color:var(--danger);"></i> ${d.name}</strong>
-        <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(d.timestamp)}</span>
-      </div>
-      <div style="color:var(--text-muted); font-size:0.85rem;">${d.email}</div>
-      <div style="margin-top:0.35rem; padding:0.5rem; background:var(--surface-muted); border-radius:8px; font-style:italic;">
-        "${d.reason}"${d.comments ? `<br/><span style="font-size:0.8rem;">Comments: ${d.comments}</span>` : ''}
-      </div>
-    </li>
-  `).join('') || '<li style="padding:0.5rem 0; color:var(--text-muted);">No one has declined.</li>';
+  const declinedList = declined.map(d => {
+    const role = getUserRole(d.email);
+    return `
+      <li style="padding:0.5rem 0; border-bottom:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; gap:0.5rem; flex-wrap:wrap;">
+          <strong><i class="fas fa-times-circle" style="color:var(--danger);"></i> ${d.name}</strong>
+          <span style="color:var(--text-muted); font-size:0.85rem;">
+            <span class="badge badge-warning">${role}</span>
+            <span style="margin-left:0.5rem;">${formatDate(d.timestamp)}</span>
+          </span>
+        </div>
+        <div style="color:var(--text-muted); font-size:0.85rem;">${d.email}</div>
+        <div style="margin-top:0.35rem; padding:0.5rem 0.75rem; background:var(--surface-muted); border-radius:8px; font-style:italic; border-left:3px solid var(--danger);">
+          <strong>Reason:</strong> "${d.reason}"${d.comments ? `<br/><span style="font-size:0.8rem;">📝 Comments: ${d.comments}</span>` : ''}
+        </div>
+      </li>
+    `;
+  }).join('') || '<li style="padding:0.5rem 0; color:var(--text-muted);">No one has declined.</li>';
+
+  const meetingInfo = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
+      <h3 style="margin:0;"><i class="fas fa-list"></i> Attendance: ${meeting.title}</h3>
+      <span class="badge badge-info">${getMunicipalityLabel(meeting.municipality)}</span>
+    </div>
+    <div style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1rem;">
+      📅 ${formatDate(meeting.date)} at ${meeting.time} • 📍 ${meeting.location}
+    </div>
+  `;
+
+  const showAllAttendees = attendees.length > 5;
+  const showAllDeclined = declined.length > 5;
 
   showModal(`
-    <h3><i class="fas fa-list"></i> Attendance: ${meeting.title}</h3>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
-      <div class="card" style="background:var(--surface-alt);">
-        <div class="card-title" style="color:var(--success);">
-          <i class="fas fa-check-circle"></i> Attending (${attendees.length})
+    <div id="attendancePrintArea">
+      ${meetingInfo}
+      
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div class="card" style="background:var(--surface-alt);">
+          <div class="card-title" style="color:var(--success); display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-check-circle"></i> Attending (${attendees.length})</span>
+            ${attendees.length > 5 ? `<button class="btn btn-sm btn-outline" onclick="toggleAttendanceList()"><i class="fas fa-chevron-down"></i> View All</button>` : ''}
+          </div>
+          <ul id="attendeeList" style="list-style:none; padding:0; margin:0; max-height: ${showAllAttendees ? '200px' : 'auto'}; overflow-y: ${showAllAttendees ? 'auto' : 'visible'};">
+            ${attendeeList}
+          </ul>
+          ${showAllAttendees ? `
+            <div style="text-align:center; margin-top:0.5rem;">
+              <button class="btn btn-sm btn-outline" onclick="toggleAttendanceList()">
+                <i class="fas fa-chevron-down"></i> Show All (${attendees.length})
+              </button>
+            </div>
+          ` : ''}
         </div>
-        <ul style="list-style:none; padding:0; margin:0;">${attendeeList}</ul>
-      </div>
-      <div class="card" style="background:var(--surface-alt);">
-        <div class="card-title" style="color:var(--danger);">
-          <i class="fas fa-times-circle"></i> Declined (${declined.length})
+        
+        <div class="card" style="background:var(--surface-alt);">
+          <div class="card-title" style="color:var(--danger); display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-times-circle"></i> Declined (${declined.length})</span>
+            ${declined.length > 5 ? `<button class="btn btn-sm btn-outline" onclick="toggleDeclinedList()"><i class="fas fa-chevron-down"></i> View All</button>` : ''}
+          </div>
+          <ul id="declinedList" style="list-style:none; padding:0; margin:0; max-height: ${showAllDeclined ? '200px' : 'auto'}; overflow-y: ${showAllDeclined ? 'auto' : 'visible'};">
+            ${declinedList}
+          </ul>
+          ${showAllDeclined ? `
+            <div style="text-align:center; margin-top:0.5rem;">
+              <button class="btn btn-sm btn-outline" onclick="toggleDeclinedList()">
+                <i class="fas fa-chevron-down"></i> Show All (${declined.length})
+              </button>
+            </div>
+          ` : ''}
         </div>
-        <ul style="list-style:none; padding:0; margin:0;">${declinedList}</ul>
       </div>
     </div>
-    <button class="btn btn-outline btn-block" style="margin-top:1rem;" onclick="closeModal()">Close</button>
+    
+    <div style="display:flex; gap:0.5rem; margin-top:1rem; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--border); padding-top:1rem;">
+      <button class="btn btn-primary btn-sm" onclick="printAttendance()">
+        <i class="fas fa-print"></i> Print
+      </button>
+      <button class="btn btn-success btn-sm" onclick="downloadAttendanceHTML()">
+        <i class="fas fa-file-pdf"></i> Download HTML
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">
+        <i class="fas fa-times"></i> Close
+      </button>
+    </div>
   `);
 }
 
-async function deleteMeeting(id) {
-  if (!confirm('Delete this meeting?')) return;
-  const success = await DB._deleteItem('meetings', id);
-  if (success) {
-      toast('Meeting deleted', 'success');
-      navigate('meetings');
-  } else {
-      toast('Failed to delete meeting', 'danger');
+function toggleAttendanceList() {
+  const list = document.getElementById('attendeeList');
+  if (list) {
+    const isExpanded = list.style.maxHeight !== '200px';
+    list.style.maxHeight = isExpanded ? '200px' : 'none';
+    list.style.overflowY = isExpanded ? 'auto' : 'visible';
+    const btn = list.parentElement.querySelector('.btn-outline');
+    if (btn) {
+      btn.innerHTML = isExpanded ? 
+        `<i class="fas fa-chevron-down"></i> Show All` : 
+        `<i class="fas fa-chevron-up"></i> Show Less`;
+    }
   }
 }
+
+function toggleDeclinedList() {
+  const list = document.getElementById('declinedList');
+  if (list) {
+    const isExpanded = list.style.maxHeight !== '200px';
+    list.style.maxHeight = isExpanded ? '200px' : 'none';
+    list.style.overflowY = isExpanded ? 'auto' : 'visible';
+    const btn = list.parentElement.querySelector('.btn-outline');
+    if (btn) {
+      btn.innerHTML = isExpanded ? 
+        `<i class="fas fa-chevron-down"></i> Show All` : 
+        `<i class="fas fa-chevron-up"></i> Show Less`;
+    }
+  }
+}
+
+function printAttendance() {
+  const content = document.getElementById('attendancePrintArea');
+  if (!content) return;
+  
+  const meetingTitle = content.querySelector('h3')?.textContent?.replace('Attendance: ', '') || 'Meeting';
+  const meetingDetails = content.querySelector('div[style*="color:var(--text-muted)"]')?.textContent || '';
+  
+  const attendeeItems = content.querySelectorAll('#attendeeList li');
+  const declinedItems = content.querySelectorAll('#declinedList li');
+  
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Attendance - ${meetingTitle}</title>
+        <style>
+          body { font-family: 'Times New Roman', Arial, sans-serif; padding: 40px; max-width: 1000px; margin: 0 auto; color: #1a1a2e; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px double #1a1a2e; padding-bottom: 20px; }
+          .header h1 { font-size: 24px; margin: 0; color: #1a1a2e; }
+          .header .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
+          .meeting-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #1a1a2e; }
+          .section { margin-bottom: 30px; }
+          .section-title { font-size: 18px; font-weight: bold; padding: 10px 0; border-bottom: 2px solid #1a1a2e; margin-bottom: 15px; }
+          .section-title.success { color: #28a745; border-color: #28a745; }
+          .section-title.danger { color: #dc3545; border-color: #dc3545; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f1f1f1; padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; }
+          td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+          .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          .badge-info { background: #e3f2fd; color: #0d47a1; }
+          .badge-warning { background: #fff3e0; color: #e65100; }
+          .signature-section { margin-top: 40px; padding-top: 20px; border-top: 2px solid #1a1a2e; }
+          .signature-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin-top: 20px; }
+          .signature-item { text-align: center; }
+          .signature-line { border-top: 1px solid #1a1a2e; margin: 40px 0 5px 0; width: 100%; }
+          .signature-label { font-size: 12px; color: #666; margin-top: 5px; }
+          .footer { text-align: center; color: #999; margin-top: 30px; font-size: 11px; border-top: 1px solid #ddd; padding-top: 15px; }
+          @media print { .no-print { display: none; } body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MURANG'A COUNTY MUNICIPAL BOARD</h1>
+          <div class="subtitle">Meeting Attendance Report</div>
+        </div>
+        
+        <div class="meeting-info">
+          <strong>Meeting:</strong> ${meetingTitle}<br>
+          <strong>Details:</strong> ${meetingDetails}
+        </div>
+        
+        <div class="section">
+          <div class="section-title success">✅ ATTENDING (${attendeeItems.length})</div>
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Email</th></tr></thead>
+            <tbody>
+              ${attendeeItems.length > 0 ? 
+                Array.from(attendeeItems).map((item, index) => {
+                  const text = item.textContent.trim();
+                  const parts = text.split(/\s+/);
+                  const name = parts.slice(0, -1).join(' ');
+                  const email = parts[parts.length - 1] || '';
+                  const roleBadge = item.querySelector('.badge');
+                  const role = roleBadge ? roleBadge.textContent : 'Member';
+                  return `<tr><td>${index + 1}</td><td><strong>${name.replace(email, '').trim()}</strong></td><td><span class="badge badge-info">${role}</span></td><td>${email}</td></tr>`;
+                }).join('') : 
+                `<tr><td colspan="4" style="text-align:center; color:#999;">No attendees</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="section">
+          <div class="section-title danger">❌ DECLINED (${declinedItems.length})</div>
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Email</th><th>Reason</th></tr></thead>
+            <tbody>
+              ${declinedItems.length > 0 ? 
+                Array.from(declinedItems).map((item, index) => {
+                  const nameEl = item.querySelector('strong');
+                  const name = nameEl ? nameEl.textContent.replace('✕', '').trim() : 'Unknown';
+                  const emailEl = item.querySelector('div[style*="color:var(--text-muted)"]');
+                  const email = emailEl ? emailEl.textContent.trim() : '';
+                  const reasonEl = item.querySelector('div[style*="background:var(--surface-muted)"]');
+                  let reason = 'Not specified';
+                  if (reasonEl) {
+                    const reasonMatch = reasonEl.textContent.match(/Reason:\s*"([^"]*)"/);
+                    if (reasonMatch) reason = reasonMatch[1];
+                  }
+                  const roleBadge = item.querySelector('.badge');
+                  const role = roleBadge ? roleBadge.textContent : 'Member';
+                  return `<tr><td>${index + 1}</td><td><strong>${name}</strong></td><td><span class="badge badge-warning">${role}</span></td><td>${email}</td><td>${reason}</td></tr>`;
+                }).join('') : 
+                `<tr><td colspan="5" style="text-align:center; color:#999;">No declines</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="signature-section">
+          <h3 style="text-align:center; margin-bottom:20px;">ATTENDANCE CONFIRMATION</h3>
+          <div class="signature-grid">
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Chairperson</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Secretary</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Municipal Officer</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:15px; font-size:12px; color:#666;">
+            <p>I confirm that the attendance listed above is accurate and complete.</p>
+          </div>
+        </div>
+        
+        <div class="footer">Report generated on ${new Date().toLocaleString()} • Page 1 of 1</div>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  setTimeout(() => { printWindow.print(); }, 500);
+}
+
+function downloadAttendanceHTML() {
+  const content = document.getElementById('attendancePrintArea');
+  if (!content) return;
+  
+  const meetingTitle = content.querySelector('h3')?.textContent?.replace('Attendance: ', '') || 'Meeting';
+  const meetingDetails = content.querySelector('div[style*="color:var(--text-muted)"]')?.textContent || '';
+  
+  const attendeeItems = content.querySelectorAll('#attendeeList li');
+  const declinedItems = content.querySelectorAll('#declinedList li');
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Attendance - ${meetingTitle}</title>
+        <style>
+          body { font-family: 'Times New Roman', Arial, sans-serif; padding: 40px; max-width: 1000px; margin: 0 auto; color: #1a1a2e; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px double #1a1a2e; padding-bottom: 20px; }
+          .header h1 { font-size: 24px; margin: 0; color: #1a1a2e; }
+          .header .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
+          .meeting-info { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #1a1a2e; }
+          .section { margin-bottom: 30px; }
+          .section-title { font-size: 18px; font-weight: bold; padding: 10px 0; border-bottom: 2px solid #1a1a2e; margin-bottom: 15px; }
+          .section-title.success { color: #28a745; border-color: #28a745; }
+          .section-title.danger { color: #dc3545; border-color: #dc3545; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f1f1f1; padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; }
+          td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+          .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+          .badge-info { background: #e3f2fd; color: #0d47a1; }
+          .badge-warning { background: #fff3e0; color: #e65100; }
+          .signature-section { margin-top: 40px; padding-top: 20px; border-top: 2px solid #1a1a2e; }
+          .signature-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin-top: 20px; }
+          .signature-item { text-align: center; }
+          .signature-line { border-top: 1px solid #1a1a2e; margin: 40px 0 5px 0; width: 100%; }
+          .signature-label { font-size: 12px; color: #666; margin-top: 5px; }
+          .footer { text-align: center; color: #999; margin-top: 30px; font-size: 11px; border-top: 1px solid #ddd; padding-top: 15px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MURANG'A COUNTY MUNICIPAL BOARD</h1>
+          <div class="subtitle">Meeting Attendance Report</div>
+        </div>
+        
+        <div class="meeting-info">
+          <strong>Meeting:</strong> ${meetingTitle}<br>
+          <strong>Details:</strong> ${meetingDetails}
+        </div>
+        
+        <div class="section">
+          <div class="section-title success">✅ ATTENDING (${attendeeItems.length})</div>
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Email</th></tr></thead>
+            <tbody>
+              ${attendeeItems.length > 0 ? 
+                Array.from(attendeeItems).map((item, index) => {
+                  const text = item.textContent.trim();
+                  const parts = text.split(/\s+/);
+                  const name = parts.slice(0, -1).join(' ');
+                  const email = parts[parts.length - 1] || '';
+                  const roleBadge = item.querySelector('.badge');
+                  const role = roleBadge ? roleBadge.textContent : 'Member';
+                  return `<tr><td>${index + 1}</td><td><strong>${name.replace(email, '').trim()}</strong></td><td><span class="badge badge-info">${role}</span></td><td>${email}</td></tr>`;
+                }).join('') : 
+                `<tr><td colspan="4" style="text-align:center; color:#999;">No attendees</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="section">
+          <div class="section-title danger">❌ DECLINED (${declinedItems.length})</div>
+          <table>
+            <thead><tr><th>#</th><th>Name</th><th>Role</th><th>Email</th><th>Reason</th></tr></thead>
+            <tbody>
+              ${declinedItems.length > 0 ? 
+                Array.from(declinedItems).map((item, index) => {
+                  const nameEl = item.querySelector('strong');
+                  const name = nameEl ? nameEl.textContent.replace('✕', '').trim() : 'Unknown';
+                  const emailEl = item.querySelector('div[style*="color:var(--text-muted)"]');
+                  const email = emailEl ? emailEl.textContent.trim() : '';
+                  const reasonEl = item.querySelector('div[style*="background:var(--surface-muted)"]');
+                  let reason = 'Not specified';
+                  if (reasonEl) {
+                    const reasonMatch = reasonEl.textContent.match(/Reason:\s*"([^"]*)"/);
+                    if (reasonMatch) reason = reasonMatch[1];
+                  }
+                  const roleBadge = item.querySelector('.badge');
+                  const role = roleBadge ? roleBadge.textContent : 'Member';
+                  return `<tr><td>${index + 1}</td><td><strong>${name}</strong></td><td><span class="badge badge-warning">${role}</span></td><td>${email}</td><td>${reason}</td></tr>`;
+                }).join('') : 
+                `<tr><td colspan="5" style="text-align:center; color:#999;">No declines</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="signature-section">
+          <h3 style="text-align:center; margin-bottom:20px;">ATTENDANCE CONFIRMATION</h3>
+          <div class="signature-grid">
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Chairperson</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Secretary</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+            <div class="signature-item">
+              <div class="signature-line"></div>
+              <div class="signature-label">Municipal Officer</div>
+              <div style="font-size:11px; color:#666; margin-top:5px;">Date: ___________</div>
+            </div>
+          </div>
+          <div style="text-align:center; margin-top:15px; font-size:12px; color:#666;">
+            <p>I confirm that the attendance listed above is accurate and complete.</p>
+          </div>
+        </div>
+        
+        <div class="footer">Report generated on ${new Date().toLocaleString()} • Page 1 of 1</div>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `Attendance_${meetingTitle.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.html`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+  toast('Attendance report downloaded ✅', 'success');
+}
+
+// Enhanced Delete Meeting
+async function deleteMeeting(id) {
+  const meetings = await DB.meetings();
+  const meeting = meetings.find(item => item.id === id);
+  if (!meeting) {
+    toast('Meeting not found', 'danger');
+    return;
+  }
+
+  const attendeeCount = meeting.attendees ? meeting.attendees.length : 0;
+  const declineCount = meeting.declined ? meeting.declined.length : 0;
+
+  showModal(`
+    <div style="text-align:center;">
+      <div style="font-size:4rem; margin-bottom:0.5rem;">🗑️</div>
+      <h3 style="color:var(--danger);">Delete Meeting</h3>
+      <p style="color:var(--text-muted); margin:1rem 0;">
+        Are you sure you want to delete this meeting?
+      </p>
+      <div style="background:var(--surface-alt); padding:1rem; border-radius:12px; margin:1rem 0; text-align:left;">
+        <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+          <span><i class="fas fa-calendar-alt"></i> Title:</span>
+          <strong>${meeting.title}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+          <span><i class="fas fa-calendar-day"></i> Date:</span>
+          <strong>${formatDate(meeting.date)}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+          <span><i class="fas fa-map-marker-alt"></i> Location:</span>
+          <strong>${meeting.location}</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+          <span><i class="fas fa-users"></i> Attendees:</span>
+          <strong>${attendeeCount} attending</strong>
+        </div>
+        ${declineCount > 0 ? `
+          <div style="display:flex; justify-content:space-between; padding:0.25rem 0;">
+            <span><i class="fas fa-times-circle" style="color:var(--danger);"></i> Declined:</span>
+            <strong style="color:var(--danger);">${declineCount} declined</strong>
+          </div>
+        ` : ''}
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-danger" onclick="confirmDeleteMeeting(${id})">
+          <i class="fas fa-trash"></i> Yes, Delete
+        </button>
+        <button class="btn btn-outline" onclick="closeModal()">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+async function confirmDeleteMeeting(id) {
+  const success = await DB._deleteItem('meetings', id);
+  closeModal();
+  if (success) {
+    toast('Meeting deleted successfully 🗑️', 'success');
+    navigate('meetings');
+  } else {
+    toast('Failed to delete meeting', 'danger');
+  }
+}
+
+// ============= REST OF THE CODE (unchanged) =============
 
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
@@ -939,7 +1406,6 @@ async function renderUsers() {
   `);
 }
 
-// ============= TRACK USERS MODULE =============
 async function renderTrackUsers() {
   if (!isSystemAdmin(currentUser)) {
     render('<div class="card"><h2>Access Denied</h2><p>Only the Super Admin can track users.</p></div>');
@@ -1642,7 +2108,6 @@ async function boot() {
       if (event.ctrlKey && event.key.toLowerCase() === 'l') { event.preventDefault(); logout(); }
     });
     
-    // --- HEARTBEAT TIMER ---
     setInterval(async () => {
       if (currentUser && currentUser.id) {
         try {
@@ -1665,7 +2130,6 @@ async function boot() {
   }
 }
 
-// ============= CREATE ACCOUNT MODAL (from app.js) =============
 function showCreateAccountModal() {
   showModal(`
     <h3><i class="fas fa-user-plus"></i> Create Account</h3>
@@ -1753,7 +2217,6 @@ function showCreateAccountModal() {
   });
 }
 
-// ============= REGISTRATION & OAUTH MODULE =============
 function showRegisterModal() {
     showCreateAccountModal();
 }
@@ -1837,6 +2300,7 @@ async function loginWithOAuth(providerName, providerId) {
     });
 }
 
+// Make functions globally accessible
 window.navigate = navigate;
 window.showAddMemberModal = showAddMemberModal;
 window.deleteMember = deleteMember;
@@ -1845,6 +2309,7 @@ window.confirmAttendance = confirmAttendance;
 window.showDeclineModal = showDeclineModal;
 window.viewAttendance = viewAttendance;
 window.deleteMeeting = deleteMeeting;
+window.confirmDeleteMeeting = confirmDeleteMeeting;
 window.showUploadMinutesModal = showUploadMinutesModal;
 window.showAddComplaintModal = showAddComplaintModal;
 window.assignComplaint = assignComplaint;
@@ -1877,4 +2342,9 @@ window.loginWithGoogle = loginWithGoogle;
 window.loginWithMicrosoft = loginWithMicrosoft;
 window.checkPasswordStrength = checkPasswordStrength;
 window.checkPasswordMatch = checkPasswordMatch;
+window.toggleAttendanceList = toggleAttendanceList;
+window.toggleDeclinedList = toggleDeclinedList;
+window.printAttendance = printAttendance;
+window.downloadAttendanceHTML = downloadAttendanceHTML;
+
 window.addEventListener('DOMContentLoaded', boot);

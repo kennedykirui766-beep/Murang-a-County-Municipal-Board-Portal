@@ -3,7 +3,9 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, date
 import os
+import json
 
 # --- App Configuration ---
 app = Flask(__name__, static_folder='.')
@@ -34,7 +36,6 @@ def settings():
 @app.route('/api/login', methods=['POST'])
 def login():
     from models import User
-    from datetime import datetime
     
     credentials = request.json
     email = credentials.get('email')
@@ -43,7 +44,7 @@ def login():
     user = User.query.filter_by(email=email).first()
     
     if user and check_password_hash(user.password, password):
-        user.last_seen = datetime.utcnow().isoformat() # <-- ADD THIS LINE
+        user.last_seen = datetime.utcnow().isoformat()
         db.session.commit()
         return jsonify(user.to_dict()), 200
     else:
@@ -52,7 +53,6 @@ def login():
 @app.route('/api/oauth-login', methods=['POST'])
 def oauth_login():
     from models import User, Member
-    from datetime import datetime, date
     import secrets
     
     data = request.json
@@ -97,7 +97,6 @@ def oauth_login():
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
     from models import User
-    from datetime import datetime
     
     data = request.json
     user_id = data.get('user_id')
@@ -131,7 +130,8 @@ def register():
         email=email,
         password=hashed_password,
         role='member', # Force 'member' role for public registration
-        municipality=data.get('municipality')
+        municipality=data.get('municipality'),
+        last_seen=''
     )
     
     db.session.add(new_user)
@@ -142,15 +142,21 @@ def register():
 def get_model(entity_name):
     from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast
     return {
-        'users': User, 'members': Member, 'meetings': Meeting,
-        'complaints': Complaint, 'minutes': Minute, 'documents': Document,
-        'emails': Email, 'broadcasts': Broadcast  
+        'users': User, 
+        'members': Member, 
+        'meetings': Meeting,
+        'complaints': Complaint, 
+        'minutes': Minute, 
+        'documents': Document,
+        'emails': Email, 
+        'broadcasts': Broadcast  
     }.get(entity_name)
 
 @app.route('/api/<entity>', methods=['GET'])
 def get_entity(entity):
     Model = get_model(entity)
-    if not Model: return jsonify([]), 404
+    if not Model: 
+        return jsonify([]), 404
     items = Model.query.all()
     return jsonify([item.to_dict() for item in items]), 200
 
@@ -162,17 +168,35 @@ def add_entity_item(entity):
     Public registration uses /api/register.
     """
     Model = get_model(entity)
-    if not Model: return jsonify({'error': 'Entity not found'}), 404
+    if not Model: 
+        return jsonify({'error': 'Entity not found'}), 404
     
     data = request.json
     
     # Hash password if creating a user
     if entity == 'users':
         data['password'] = generate_password_hash(data.get('password'))
+        data['last_seen'] = ''
     
+    # Handle meeting attendees and declined as JSON
     if entity == 'meetings':
-        data['attendees'] = str(data.get('attendees', []))
-        data['declined'] = str(data.get('declined', []))
+        # Ensure attendees is a list and convert to JSON string
+        attendees = data.get('attendees', [])
+        if isinstance(attendees, str):
+            try:
+                attendees = json.loads(attendees)
+            except:
+                attendees = []
+        data['attendees'] = json.dumps(attendees)
+        
+        # Ensure declined is a list and convert to JSON string
+        declined = data.get('declined', [])
+        if isinstance(declined, str):
+            try:
+                declined = json.loads(declined)
+            except:
+                declined = []
+        data['declined'] = json.dumps(declined)
 
     new_item = Model(**data)
     db.session.add(new_item)
@@ -183,35 +207,65 @@ def add_entity_item(entity):
 @app.route('/api/<entity>/<int:item_id>', methods=['PUT'])
 def update_entity_item(entity, item_id):
     Model = get_model(entity)
-    if not Model: return jsonify({'error': 'Entity not found'}), 404
+    if not Model: 
+        return jsonify({'error': 'Entity not found'}), 404
     
     item = Model.query.get(item_id)
-    if not item: return jsonify({'error': 'Item not found'}), 404
+    if not item: 
+        return jsonify({'error': 'Item not found'}), 404
 
     updated_data = request.json
 
     # If updating a user's password, hash it. 
-    # If 'password' is not in the payload, it won't be changed.
-    if entity == 'users' and 'password' in updated_data:
+    if entity == 'users' and 'password' in updated_data and updated_data['password']:
         updated_data['password'] = generate_password_hash(updated_data['password'])
 
+    # Handle meeting attendees and declined as JSON
     if entity == 'meetings':
-        updated_data['attendees'] = str(updated_data.get('attendees', []))
-        updated_data['declined'] = str(updated_data.get('declined', []))
+        # Process attendees
+        if 'attendees' in updated_data:
+            attendees = updated_data['attendees']
+            if isinstance(attendees, list):
+                updated_data['attendees'] = json.dumps(attendees)
+            elif isinstance(attendees, str):
+                try:
+                    # Validate it's proper JSON
+                    json.loads(attendees)
+                    updated_data['attendees'] = attendees
+                except:
+                    updated_data['attendees'] = json.dumps([])
+            else:
+                updated_data['attendees'] = json.dumps([])
+        
+        # Process declined
+        if 'declined' in updated_data:
+            declined = updated_data['declined']
+            if isinstance(declined, list):
+                updated_data['declined'] = json.dumps(declined)
+            elif isinstance(declined, str):
+                try:
+                    # Validate it's proper JSON
+                    json.loads(declined)
+                    updated_data['declined'] = declined
+                except:
+                    updated_data['declined'] = json.dumps([])
+            else:
+                updated_data['declined'] = json.dumps([])
 
+    # Update only the fields that were provided
     for key, value in updated_data.items():
-        if hasattr(item, key):
+        if hasattr(item, key) and key != 'id':
             setattr(item, key, value)
             
     db.session.commit()
+    
+    # Return the updated item
     return jsonify(item.to_dict()), 200
 
 @app.route('/api/<entity>/<int:item_id>', methods=['DELETE'])
 def delete_entity_item(entity, item_id):
     """
     Deletes a single item from the database.
-    This is the correct way to handle deletion and prevents
-    the entire table from being affected.
     """
     Model = get_model(entity)
     if not Model:
@@ -229,20 +283,36 @@ def delete_entity_item(entity, item_id):
 @app.route('/api/<entity>', methods=['PUT'])
 def replace_entity_list(entity):
     Model = get_model(entity)
-    if not Model: return jsonify({'error': 'Entity not found'}), 404
+    if not Model: 
+        return jsonify({'error': 'Entity not found'}), 404
     
     new_list_data = request.json
     
+    # Delete all existing records
     Model.query.delete()
     db.session.commit()
     
     new_items = []
     for item_data in new_list_data:
         if entity == 'users':
-            item_data['password'] = generate_password_hash(item_data.get('password'))
+            item_data['password'] = generate_password_hash(item_data.get('password', 'default123'))
+            if 'last_seen' not in item_data:
+                item_data['last_seen'] = ''
         if entity == 'meetings':
-            item_data['attendees'] = str(item_data.get('attendees', []))
-            item_data['declined'] = str(item_data.get('declined', []))
+            # Ensure attendees is JSON string
+            attendees = item_data.get('attendees', [])
+            if isinstance(attendees, list):
+                item_data['attendees'] = json.dumps(attendees)
+            elif not isinstance(attendees, str):
+                item_data['attendees'] = json.dumps([])
+            
+            # Ensure declined is JSON string
+            declined = item_data.get('declined', [])
+            if isinstance(declined, list):
+                item_data['declined'] = json.dumps(declined)
+            elif not isinstance(declined, str):
+                item_data['declined'] = json.dumps([])
+                
         new_items.append(Model(**item_data))
         
     db.session.add_all(new_items)

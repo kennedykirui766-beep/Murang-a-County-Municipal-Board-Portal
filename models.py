@@ -16,7 +16,7 @@ class User(db.Model):
     password = db.Column(db.String(200))
     role = db.Column(db.String(50))
     municipality = db.Column(db.String(50))
-    last_seen = db.Column(db.String(50), default='')  # <-- NEW: Tracks activity
+    last_seen = db.Column(db.String(50), default='')  # Tracks activity
     
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -33,8 +33,12 @@ class Member(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id, 'name': self.name, 'email': self.email,
-            'role': self.role, 'municipality': self.municipality, 'joined': self.joined
+            'id': self.id, 
+            'name': self.name, 
+            'email': self.email,
+            'role': self.role, 
+            'municipality': self.municipality, 
+            'joined': self.joined
         }
 
 
@@ -46,8 +50,8 @@ class Meeting(db.Model):
     location = db.Column(db.String(200))
     municipality = db.Column(db.String(50))
     status = db.Column(db.String(50))
-    attendees = db.Column(db.Text)  # Stored as JSON string
-    declined = db.Column(db.Text)   # NEW: Stored as JSON string
+    attendees = db.Column(db.Text, default='[]')  # Stored as JSON string
+    declined = db.Column(db.Text, default='[]')   # Stored as JSON string with reason
     
     def to_dict(self):
         d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
