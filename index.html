@@ -43,20 +43,34 @@
         <div id="loginError" class="alert alert-danger" style="display:none;">Invalid credentials. Please try again.</div>
         <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Login</button>
       </form>
+      
+      <!-- Create Account Button -->
+      <div style="margin-top: 1rem; text-align: center;">
+        <hr style="border: none; border-top: 1px solid var(--border); margin-bottom: 1rem;" />
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem;">Don't have an account?</p>
+        <button class="btn btn-outline btn-block" onclick="showCreateAccountModal()">
+          <i class="fas fa-user-plus"></i> Create Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Account Modal -->
+  <div class="modal-overlay" id="createAccountModal">
+    <div class="modal-box">
+      <button class="close-modal" onclick="closeCreateAccountModal()">&times;</button>
+      <div id="createAccountBody"></div>
+    </div>
+  </div>
+
+  <!-- Decline Reason Modal -->
+  <div class="modal-overlay" id="declineModal">
+    <div class="modal-box">
+      <button class="close-modal" onclick="closeDeclineModal()">&times;</button>
+      <div id="declineBody"></div>
     </div>
   </div>
 
   <script src="app_backend.js"></script>
-  <!-- Fine Print Footer for Login Page -->
-
-<footer style="text-align: center; padding: 1.5rem; font-size: 0.75rem; color: #666; margin-top: 2rem;">
-  <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
-  <p>Unauthorized access or use of this system is strictly prohibited. By logging in, you agree to the <a href="#" style="color: inherit; text-decoration: underline;">Terms of Service</a> and <a href="#" style="color: inherit; text-decoration: underline;">Privacy Policy</a>.</p>
-</footer>
-
-<script>
-  // Automatically update the year
-  document.getElementById('currentYear').textContent = new Date().getFullYear();
-</script>
 </body>
 </html>
