@@ -1,4 +1,4 @@
-// c:\projo\app_backend.js
+
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
@@ -399,7 +399,7 @@ async function renderRegister() {
   });
 }
 
-// ============= DASHBOARD =============
+//  DASHBOARD 
 
 async function renderDashboard() {
   const members = getAllowedItems(await DB.members());
@@ -477,7 +477,7 @@ async function renderDashboard() {
   `);
 }
 
-// ============= MEMBERS =============
+// MEMBERS 
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
@@ -568,7 +568,7 @@ async function deleteMember(id) {
   }
 }
 
-// ============= MEETINGS (Updated with Features & Styles) =============
+// MEETINGS (Updated with Features & Styles)
 
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
