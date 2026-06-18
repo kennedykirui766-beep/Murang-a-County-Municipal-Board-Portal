@@ -132,6 +132,8 @@ async function seedData() { }
 let currentUser = null;
 let speechUtterance = null;
 let uploadedMeetingFiles = [];
+let uploadedMinutesFiles = [];
+let uploadedBroadcastFiles = [];
 
 const qs = selector => document.querySelector(selector);
 const qsa = selector => document.querySelectorAll(selector);
@@ -360,7 +362,7 @@ async function showAddMemberModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   let roleOptions = ['member'];
   if (currentUser.role === 'super_admin') {
-    roleOptions = ['super_admin', 'municipal_officer', 'member'];
+    roleOptions = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
   }
 
   showModal(`
@@ -419,7 +421,7 @@ async function deleteMember(id) {
 
 // ============= UPDATED MEETING FUNCTIONS WITH FILE PREVIEW =============
 
-// File upload handlers
+// File upload handlers for meetings
 function handleFileSelect(event) {
   const files = event.target.files;
   handleFiles(files);
@@ -460,12 +462,10 @@ function handleDragLeave(event) {
 function handleFiles(files) {
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'danger');
       continue;
     }
-    // Check file type
     const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
                         'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                         'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -475,7 +475,6 @@ function handleFiles(files) {
       continue;
     }
     
-    // Convert file to base64 and store
     const reader = new FileReader();
     reader.onload = function(e) {
       const fileData = {
@@ -490,7 +489,6 @@ function handleFiles(files) {
     };
     reader.readAsDataURL(file);
   }
-  // Reset the file input
   const fileInput = document.getElementById('fileInput');
   if (fileInput) fileInput.value = '';
 }
@@ -533,7 +531,7 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-// Enhanced Schedule Meeting Modal with Description and File Upload
+// Enhanced Schedule Meeting Modal
 async function showScheduleMeetingModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   uploadedMeetingFiles = [];
@@ -595,7 +593,6 @@ async function showScheduleMeetingModal() {
     </form>
   `);
   
-  // Add drag and drop event listeners
   document.addEventListener('dragover', function(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -605,7 +602,6 @@ async function showScheduleMeetingModal() {
     e.stopPropagation();
   });
   
-  // Handle form submission
   byId('scheduleMeetingForm').addEventListener('submit', async function (event) {
     event.preventDefault();
     const title = byId('mtTitle').value.trim();
@@ -620,7 +616,6 @@ async function showScheduleMeetingModal() {
       return; 
     }
     
-    // Create meeting object with file data
     const meetingData = { 
       title, 
       description, 
@@ -654,7 +649,6 @@ async function viewMeetingFiles(id) {
     return;
   }
 
-  // Separate images from other files
   const images = meeting.files.filter(f => f.type && f.type.startsWith('image/'));
   const documents = meeting.files.filter(f => f.type && !f.type.startsWith('image/'));
 
@@ -718,7 +712,6 @@ async function viewMeetingFiles(id) {
   `);
 }
 
-// Preview File in Modal
 function previewFile(meetingId, fileIndex) {
   const meetings = (async () => { return await DB.meetings(); })();
   meetings.then(meetingsList => {
@@ -764,7 +757,6 @@ function previewFile(meetingId, fileIndex) {
   });
 }
 
-// Download meeting file
 function downloadMeetingFile(meetingId, fileIndex) {
   const meetings = (async () => { return await DB.meetings(); })();
   meetings.then(meetingsList => {
@@ -784,7 +776,6 @@ function downloadMeetingFile(meetingId, fileIndex) {
   });
 }
 
-// Updated renderMeetings to show description and files with preview
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
@@ -1437,7 +1428,6 @@ function downloadAttendanceHTML() {
   toast('Attendance report downloaded ✅', 'success');
 }
 
-// Enhanced Delete Meeting
 async function deleteMeeting(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
@@ -1515,50 +1505,203 @@ async function confirmDeleteMeeting(id) {
   }
 }
 
-// ============= REST OF THE CODE (unchanged functions) =============
+// ============= ENHANCED MINUTES FUNCTIONS =============
 
-async function renderMinutes() {
-  const minutes = getAllowedItems(await DB.minutes());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
-  render(`
-    <div class="page-header">
-      <h2><i class="fas fa-file-alt"></i> Meeting Minutes</h2>
-      ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showUploadMinutesModal()"><i class="fas fa-upload"></i> Upload Minutes</button>' : ''}
-    </div>
-    ${minutes.length ? minutes.map(item => `
-      <div class="card">
-        <div class="flex-between" style="display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
-          <strong>${item.uploadedBy}</strong>
-          <span style="color:var(--text-muted);">${formatDate(item.uploadDate)}</span>
-        </div>
-        <p style="margin-top:0.85rem;">${item.content}</p>
-        <p style="color:var(--text-muted);font-size:0.95rem;">${getMunicipalityLabel(item.municipality)}${item.meetingId ? ` • Meeting #${item.meetingId}` : ''}</p>
-      </div>
-    `).join('') : '<div class="card text-center text-muted">No minutes uploaded yet.</div>'}
-  `);
+// Minutes file upload handlers
+function handleMinutesFileSelect(event) {
+  const files = event.target.files;
+  handleMinutesFiles(files);
 }
 
+function handleMinutesFileDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const files = event.dataTransfer.files;
+  handleMinutesFiles(files);
+  const dropZone = document.getElementById('minutesUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleMinutesDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('minutesUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--primary)';
+    dropZone.style.background = 'var(--surface-alt)';
+  }
+}
+
+function handleMinutesDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('minutesUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleMinutesFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > 10 * 1024 * 1024) {
+      toast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'danger');
+      continue;
+    }
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      toast(`File "${file.name}" is not a supported format.`, 'warning');
+      continue;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: e.target.result,
+        uploadDate: new Date().toISOString()
+      };
+      uploadedMinutesFiles.push(fileData);
+      displayMinutesFileList();
+    };
+    reader.readAsDataURL(file);
+  }
+  const fileInput = document.getElementById('minutesFileInput');
+  if (fileInput) fileInput.value = '';
+}
+
+function displayMinutesFileList() {
+  const fileList = document.getElementById('minutesFileList');
+  if (!fileList) return;
+  
+  fileList.innerHTML = uploadedMinutesFiles.map((file, index) => {
+    const isImage = file.type && file.type.startsWith('image/');
+    return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--surface-alt); padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border);">
+      ${isImage ? `<img src="${file.data}" style="width:24px; height:24px; object-fit:cover; border-radius:4px;" />` : `<i class="${getFileIcon(file.type)}" style="color:var(--primary);"></i>`}
+      <span style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</span>
+      <span style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeMinutesFile(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `}).join('');
+}
+
+function removeMinutesFile(index) {
+  uploadedMinutesFiles.splice(index, 1);
+  displayMinutesFileList();
+}
+
+// Enhanced Show Upload Minutes Modal with Title, Summary, and File Upload
 async function showUploadMinutesModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  uploadedMinutesFiles = [];
+  
+  // Get meetings for the dropdown
+  const meetings = await DB.meetings();
+  const allowedMeetings = getAllowedItems(meetings);
+  
+  // Generate meeting ID options
+  let meetingOptions = '<option value="">None (General Minutes)</option>';
+  allowedMeetings.forEach(meeting => {
+    meetingOptions += `<option value="${meeting.id}">${meeting.id} - ${meeting.title} (${formatDate(meeting.date)})</option>`;
+  });
+
   showModal(`
-    <h3><i class="fas fa-upload"></i> Upload Meeting Minutes</h3>
-    <form id="uploadMinutesForm">
-      <div class="form-group"><label>Content</label><textarea id="minContent" rows="5" required></textarea></div>
-      <div class="form-group"><label>Municipality</label><select id="minMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Meeting ID (optional)</label><input type="number" id="minMeetingId" placeholder="Meeting ID" /></div>
-      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-upload"></i> Upload</button>
+    <h3><i class="fas fa-file-alt"></i> Upload Meeting Minutes</h3>
+    <form id="uploadMinutesForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Minutes Title <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="minTitle" required placeholder="Enter minutes title (e.g., Kenol Budget Meeting Minutes)" />
+      </div>
+      
+      <div class="form-group">
+        <label>Summary / Key Points</label>
+        <textarea id="minSummary" rows="3" placeholder="Enter a brief summary of key decisions and outcomes..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Content / Description <span style="color:var(--danger);">*</span></label>
+        <textarea id="minContent" rows="5" required placeholder="Enter detailed minutes content..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label>Related Meeting (Optional)</label>
+        <select id="minMeetingId">
+          ${meetingOptions}
+        </select>
+        <small style="color:var(--text-muted); display:block; margin-top:0.25rem;">
+          Select a meeting to associate these minutes with, or leave as "None" for general minutes.
+        </small>
+      </div>
+      
+      <div class="form-group">
+        <label>Municipality <span style="color:var(--danger);">*</span></label>
+        <select id="minMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
+      </div>
+      
+      <div class="form-group">
+        <label>Upload Supporting Documents</label>
+        <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
+             id="minutesUploadDropZone" 
+             ondrop="handleMinutesFileDrop(event)" 
+             ondragover="handleMinutesDragOver(event)"
+             ondragleave="handleMinutesDragLeave(event)"
+             onclick="document.getElementById('minutesFileInput').click()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
+          <p style="margin:0.5rem 0; color:var(--text-muted);">
+            Drag & drop files here or click to browse
+          </p>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Supports: PDF, Word, Excel, PowerPoint, Images (JPG, PNG, GIF) • Max 10MB each
+          </p>
+          <input type="file" id="minutesFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleMinutesFileSelect(event)" />
+        </div>
+        <div id="minutesFileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-upload"></i> Upload Minutes</button>
     </form>
   `);
+  
   byId('uploadMinutesForm').addEventListener('submit', async function (event) {
     event.preventDefault();
+    const title = byId('minTitle').value.trim();
+    const summary = byId('minSummary').value.trim();
     const content = byId('minContent').value.trim();
+    const meetingId = byId('minMeetingId').value ? parseInt(byId('minMeetingId').value) : null;
     const municipality = byId('minMunicipality').value;
-    const meetingId = parseInt(byId('minMeetingId').value) || null;
-    if (!content) { toast('Please add content', 'danger'); return; }
-    const newMinute = await DB.addMinute({ meetingId, content, uploadedBy: currentUser.name, municipality, uploadDate: new Date().toISOString().slice(0, 10) });
+    
+    if (!title || !content) { 
+      toast('Please fill in title and content', 'danger'); 
+      return; 
+    }
+    
+    const minuteData = { 
+      title,
+      summary,
+      content,
+      meetingId,
+      uploadedBy: currentUser.name,
+      municipality,
+      uploadDate: new Date().toISOString().slice(0, 10),
+      files: uploadedMinutesFiles
+    };
+    
+    const newMinute = await DB.addMinute(minuteData);
     if (newMinute) {
         closeModal();
-        toast('Minutes uploaded', 'success');
+        toast('Minutes uploaded successfully with ' + uploadedMinutesFiles.length + ' file(s) attached ✅', 'success');
         navigate('minutes');
     } else {
         toast('Failed to upload minutes', 'danger');
@@ -1566,28 +1709,293 @@ async function showUploadMinutesModal() {
   });
 }
 
+// Enhanced renderMinutes with title, summary, and files
+async function renderMinutes() {
+  const minutes = getAllowedItems(await DB.minutes());
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  
+  // Sort by upload date (newest first)
+  minutes.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+  
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-file-alt"></i> Meeting Minutes</h2>
+      ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showUploadMinutesModal()"><i class="fas fa-upload"></i> Upload Minutes</button>' : ''}
+    </div>
+    ${minutes.length ? minutes.map(item => {
+      const hasFiles = item.files && item.files.length > 0;
+      const images = hasFiles ? item.files.filter(f => f.type && f.type.startsWith('image/')) : [];
+      
+      return `
+      <div class="card">
+        <div class="flex-between" style="display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
+          <strong style="font-size:1.05rem;">${item.title || 'Untitled Minutes'}</strong>
+          <span style="color:var(--text-muted); font-size:0.85rem;">
+            <i class="fas fa-calendar-day"></i> ${formatDate(item.uploadDate)}
+          </span>
+        </div>
+        ${item.meetingId ? `
+          <div style="font-size:0.85rem; color:var(--text-muted); margin:0.25rem 0;">
+            <i class="fas fa-link"></i> Meeting #${item.meetingId}
+          </div>
+        ` : ''}
+        ${item.summary ? `
+          <div style="margin:0.5rem 0; padding:0.5rem; background:var(--surface-alt); border-radius:8px; border-left:3px solid var(--primary); font-size:0.95rem;">
+            <strong>Summary:</strong> ${item.summary}
+          </div>
+        ` : ''}
+        <p style="margin-top:0.85rem;">${item.content}</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem;">
+          <div style="color:var(--text-muted);font-size:0.95rem;">
+            <i class="fas fa-user"></i> ${item.uploadedBy} • 
+            <i class="fas fa-map-marker-alt"></i> ${getMunicipalityLabel(item.municipality)}
+          </div>
+          ${hasFiles ? `
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+              ${images.slice(0, 3).map(file => `
+                <div style="width:32px; height:32px; border-radius:4px; overflow:hidden; border:1px solid var(--border); cursor:pointer;"
+                     onclick="viewMinutesFiles(${item.id})">
+                  <img src="${file.data}" style="width:100%; height:100%; object-fit:cover;" />
+                </div>
+              `).join('')}
+              <span class="file-tag" style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--surface-alt); padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid var(--border); cursor:pointer;" onclick="viewMinutesFiles(${item.id})">
+                <i class="fas fa-paperclip" style="font-size:0.7rem;"></i>
+                ${item.files.length} files
+              </span>
+            </div>
+          ` : ''}
+        </div>
+        ${canAdd ? `
+          <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
+            <button class="btn btn-danger btn-sm" onclick="deleteMinute(${item.id})">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    `}).join('') : '<div class="card text-center text-muted">No minutes uploaded yet.</div>'}
+  `);
+}
+
+// View minutes files
+async function viewMinutesFiles(id) {
+  const minutes = await DB.minutes();
+  const minute = minutes.find(item => item.id === id);
+  if (!minute || !minute.files || minute.files.length === 0) {
+    toast('No files attached to these minutes', 'info');
+    return;
+  }
+
+  const images = minute.files.filter(f => f.type && f.type.startsWith('image/'));
+  const documents = minute.files.filter(f => f.type && !f.type.startsWith('image/'));
+
+  showModal(`
+    <h3><i class="fas fa-paperclip"></i> Files: ${minute.title || 'Minutes'}</h3>
+    <div style="margin-bottom:1rem; color:var(--text-muted);">
+      <span class="badge badge-info">${minute.files.length} files</span>
+      ${images.length > 0 ? `<span class="badge badge-success">${images.length} images</span>` : ''}
+      ${documents.length > 0 ? `<span class="badge badge-warning">${documents.length} documents</span>` : ''}
+    </div>
+    
+    ${images.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-images"></i> Images (${images.length})
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:0.75rem;">
+          ${images.map((file, index) => `
+            <div style="position:relative; cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--border); transition:all 0.3s;" 
+                 onclick="previewMinutesFile(${id}, ${minute.files.indexOf(file)})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.transform='scale(1.02)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.transform='scale(1)';">
+              <img src="${file.data}" style="width:100%; height:120px; object-fit:cover;" />
+              <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; padding:0.25rem 0.5rem; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${file.name}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    ${documents.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-file-alt"></i> Documents (${documents.length})
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          ${documents.map((file, index) => {
+            const fileIndex = minute.files.indexOf(file);
+            return `
+            <div style="display:flex; align-items:center; gap:0.75rem; background:var(--surface-alt); padding:0.75rem; border-radius:8px; border:1px solid var(--border); cursor:pointer; transition:all 0.3s;"
+                 onclick="previewMinutesFile(${id}, ${fileIndex})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface-alt)';">
+              <i class="${getFileIcon(file.type)}" style="font-size:2rem; color:var(--primary);"></i>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:500; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${file.name}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); downloadMinutesFile(${id}, ${fileIndex})">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+          `}).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    <button class="btn btn-outline btn-block" style="margin-top:0.5rem;" onclick="closeModal()">Close</button>
+  `);
+}
+
+// Preview minutes file
+function previewMinutesFile(minuteId, fileIndex) {
+  const minutes = (async () => { return await DB.minutes(); })();
+  minutes.then(minutesList => {
+    const minute = minutesList.find(item => item.id === minuteId);
+    if (!minute || !minute.files || !minute.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = minute.files[fileIndex];
+    const isImage = file.type && file.type.startsWith('image/');
+    
+    showModal(`
+      <div style="text-align:center;">
+        <h3 style="margin-bottom:0.5rem;">${file.name}</h3>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+          ${formatFileSize(file.size)} • ${file.type || 'Unknown type'}
+        </div>
+        ${isImage ? `
+          <img src="${file.data}" style="max-width:100%; max-height:70vh; border-radius:8px; border:1px solid var(--border);" />
+        ` : `
+          <div style="padding:2rem; background:var(--surface-alt); border-radius:12px; border:1px solid var(--border);">
+            <i class="${getFileIcon(file.type)}" style="font-size:4rem; color:var(--primary);"></i>
+            <p style="margin-top:1rem; color:var(--text-muted);">
+              This file type cannot be previewed directly.
+            </p>
+            <button class="btn btn-primary" onclick="closeModal(); downloadMinutesFile(${minuteId}, ${fileIndex});">
+              <i class="fas fa-download"></i> Download File
+            </button>
+          </div>
+        `}
+        <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+          ${isImage ? `
+            <button class="btn btn-primary btn-sm" onclick="downloadMinutesFile(${minuteId}, ${fileIndex})">
+              <i class="fas fa-download"></i> Download
+            </button>
+          ` : ''}
+          <button class="btn btn-outline btn-sm" onclick="closeModal(); viewMinutesFiles(${minuteId});">
+            <i class="fas fa-arrow-left"></i> Back to Files
+          </button>
+        </div>
+      </div>
+    `);
+  });
+}
+
+// Download minutes file
+function downloadMinutesFile(minuteId, fileIndex) {
+  const minutes = (async () => { return await DB.minutes(); })();
+  minutes.then(minutesList => {
+    const minute = minutesList.find(item => item.id === minuteId);
+    if (!minute || !minute.files || !minute.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = minute.files[fileIndex];
+    const link = document.createElement('a');
+    link.href = file.data;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast(`Downloading: ${file.name}`, 'success');
+  });
+}
+
+// Delete minute
+async function deleteMinute(id) {
+  if (!confirm('Delete these minutes?')) return;
+  const success = await DB._deleteItem('minutes', id);
+  if (success) {
+      toast('Minutes deleted', 'success');
+      navigate('minutes');
+  } else {
+      toast('Failed to delete minutes', 'danger');
+  }
+}
+
+// ============= ENHANCED COMPLAINTS FUNCTIONS =============
+
+// Updated renderComplaints with new fields and assignment options
 async function renderComplaints() {
   const complaints = getAllowedItems(await DB.complaints());
-  const officers = (await DB.members()).filter(member => member.role === 'municipal_officer' || member.role === 'social_officer');
+  const users = await DB.users();
+  
+  // Get all social officers and department officers for assignment
+  const socialOfficers = users.filter(u => u.role === 'social_officer');
+  const departmentOfficers = users.filter(u => u.role === 'department_officer');
+  const allAssignable = [...socialOfficers, ...departmentOfficers];
+  
   const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canSubmit = currentUser.role === 'member' || currentUser.role === 'department_officer' || currentUser.role === 'social_officer' || currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  
+  // Group assignable officers by municipality
+  const assignableByMuni = {};
+  allAssignable.forEach(officer => {
+    if (!assignableByMuni[officer.municipality]) {
+      assignableByMuni[officer.municipality] = [];
+    }
+    assignableByMuni[officer.municipality].push(officer);
+  });
+
   render(`
     <div class="page-header">
       <h2><i class="fas fa-exclamation-triangle"></i> Complaints</h2>
-      ${canManage ? '<button class="btn btn-primary btn-sm" onclick="showAddComplaintModal()"><i class="fas fa-plus"></i> Report Complaint</button>' : ''}
+      ${canSubmit ? '<button class="btn btn-primary btn-sm" onclick="showAddComplaintModal()"><i class="fas fa-plus"></i> Report Complaint</button>' : ''}
     </div>
-    ${complaints.length ? complaints.map(c => `
-      <div class="complaint-item">
-        <div class="head">
-          <strong>${c.title}</strong>
-          <span class="badge ${c.status === 'pending' ? 'badge-danger' : c.status === 'resolved' ? 'badge-success' : 'badge-warning'}">${c.status}</span>
+    ${complaints.length ? complaints.map(c => {
+      const isAssigned = c.assignedTo && c.assignedTo !== '';
+      const statusColors = {
+        pending: 'badge-danger',
+        in_progress: 'badge-warning',
+        resolved: 'badge-success'
+      };
+      
+      // Get officers for this complaint's municipality
+      const muniOfficers = assignableByMuni[c.municipality] || [];
+      const allMuniOfficers = assignableByMuni['all'] || [];
+      const availableOfficers = [...muniOfficers, ...allMuniOfficers];
+      
+      return `
+      <div class="complaint-item" style="border-left:4px solid ${c.status === 'pending' ? '#dc3545' : c.status === 'in_progress' ? '#ffc107' : '#28a745'}; padding:1rem; margin-bottom:1rem; background:var(--surface); border-radius:8px; border:1px solid var(--border);">
+        <div class="head" style="display:flex;justify-content:space-between;align-items:start;gap:0.75rem;flex-wrap:wrap;">
+          <div>
+            <strong style="font-size:1.05rem;">${c.title}</strong>
+            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">
+              <i class="fas fa-user"></i> Submitted by: ${c.submittedBy || 'Unknown'} • 
+              <i class="fas fa-calendar-day"></i> ${formatDate(c.date)}
+            </div>
+          </div>
+          <span class="badge ${statusColors[c.status] || 'badge-info'}">${c.status.replace('_', ' ').toUpperCase()}</span>
         </div>
         <p style="margin:0.75rem 0;">${c.description}</p>
-        <div class="meta">${getMunicipalityLabel(c.municipality)} • ${formatDate(c.date)} • ${c.assignedTo || 'Unassigned'}</div>
+        <div class="meta" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <span>📍 ${getMunicipalityLabel(c.municipality)}</span>
+          <span>👤 Assigned to: ${c.assignedTo || 'Unassigned'} ${c.assignedToRole ? `(${getRoleLabel(c.assignedToRole)})` : ''}</span>
+        </div>
         ${canManage ? `
-          <div class="actions">
-            <select id="assignSelect_${c.id}" style="padding:0.55rem 0.8rem;border:1px solid var(--border);border-radius:14px;min-width:180px;">
+          <div class="actions" style="margin-top:0.85rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
+            <select id="assignSelect_${c.id}" style="padding:0.55rem 0.8rem;border:1px solid var(--border);border-radius:14px;min-width:200px;font-size:0.85rem;">
               <option value="">Assign to...</option>
-              ${officers.filter(o => o.municipality === c.municipality || o.municipality === 'all').map(o => `<option value="${o.name}">${o.name}</option>`).join('')}
+              <optgroup label="Social Officers">
+                ${availableOfficers.filter(o => o.role === 'social_officer').map(o => `<option value="${o.name}" data-role="social_officer">${o.name} (${o.email})</option>`).join('')}
+              </optgroup>
+              <optgroup label="Department Officers">
+                ${availableOfficers.filter(o => o.role === 'department_officer').map(o => `<option value="${o.name}" data-role="department_officer">${o.name} (${o.email})</option>`).join('')}
+              </optgroup>
             </select>
             <button class="btn btn-success btn-sm" onclick="assignComplaint(${c.id})"><i class="fas fa-user-check"></i> Assign</button>
             <button class="btn btn-warning btn-sm" onclick="updateComplaintStatus(${c.id}, 'in_progress')"><i class="fas fa-spinner"></i> In Progress</button>
@@ -1596,31 +2004,62 @@ async function renderComplaints() {
           </div>
         ` : ''}
       </div>
-    `).join('') : '<div class="card text-center text-muted">No complaints have been reported yet.</div>'}
+    `}).join('') : '<div class="card text-center text-muted">No complaints have been reported yet.</div>'}
   `);
 }
 
+// Enhanced Add Complaint Modal - now accessible to members
 async function showAddComplaintModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  
   showModal(`
-    <h3><i class="fas fa-plus"></i> Report Complaint</h3>
+    <h3><i class="fas fa-exclamation-triangle"></i> Report Complaint</h3>
     <form id="addComplaintForm">
-      <div class="form-group"><label>Title</label><input type="text" id="cTitle" required /></div>
-      <div class="form-group"><label>Description</label><textarea id="cDesc" rows="4" required></textarea></div>
-      <div class="form-group"><label>Municipality</label><select id="cMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select></div>
+      <div class="form-group">
+        <label>Complaint Title <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="cTitle" required placeholder="Enter complaint title" />
+      </div>
+      <div class="form-group">
+        <label>Description <span style="color:var(--danger);">*</span></label>
+        <textarea id="cDesc" rows="4" required placeholder="Describe your complaint in detail..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Municipality <span style="color:var(--danger);">*</span></label>
+        <select id="cMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
+      </div>
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">
+        <i class="fas fa-info-circle"></i> Your complaint will be reviewed and assigned to the appropriate officer.
+      </div>
       <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Submit Complaint</button>
     </form>
   `);
+  
   byId('addComplaintForm').addEventListener('submit', async function (event) {
     event.preventDefault();
     const title = byId('cTitle').value.trim();
     const description = byId('cDesc').value.trim();
     const municipality = byId('cMunicipality').value;
-    if (!title || !description) { toast('Complete all fields', 'danger'); return; }
-    const newComplaint = await DB.addComplaint({ title, description, municipality, status: 'pending', assignedTo: '', date: new Date().toISOString().slice(0, 10) });
+    
+    if (!title || !description) { 
+      toast('Please fill in all required fields', 'danger'); 
+      return; 
+    }
+    
+    const complaintData = { 
+      title, 
+      description, 
+      municipality, 
+      status: 'pending', 
+      assignedTo: '',
+      assignedToRole: '',
+      submittedBy: currentUser.name,
+      date: new Date().toISOString().slice(0, 10)
+    };
+    
+    const newComplaint = await DB.addComplaint(complaintData);
     if (newComplaint) {
         closeModal();
-        toast('Complaint submitted', 'success');
+        toast('Complaint submitted successfully!', 'success');
         navigate('complaints');
     } else {
         toast('Failed to submit complaint', 'danger');
@@ -1628,32 +2067,41 @@ async function showAddComplaintModal() {
   });
 }
 
+// Enhanced Assign Complaint - now includes role
 async function assignComplaint(id) {
   const select = byId(`assignSelect_${id}`);
   if (!select) return;
   const assignee = select.value;
-  if (!assignee) { toast('Select an assignee', 'danger'); return; }
+  if (!assignee) { toast('Please select an assignee', 'danger'); return; }
+  
+  // Get the role from the selected option
+  const selectedOption = select.options[select.selectedIndex];
+  const role = selectedOption ? selectedOption.dataset.role : '';
+  
   const complaints = await DB.complaints();
   const complaint = complaints.find(item => item.id === id);
   if (complaint) {
     complaint.assignedTo = assignee;
+    complaint.assignedToRole = role || '';
     complaint.status = 'in_progress';
     await DB.setComplaints(complaints);
-    toast(`Assigned to ${assignee}`, 'success');
+    toast(`Complaint assigned to ${assignee} (${getRoleLabel(role)})`, 'success');
     navigate('complaints');
   }
 }
 
+// Update complaint status
 async function updateComplaintStatus(id, status) {
   const complaints = await DB.complaints();
   const complaint = complaints.find(item => item.id === id);
   if (!complaint) return;
   complaint.status = status;
   await DB.setComplaints(complaints);
-  toast('Complaint updated', 'success');
+  toast(`Complaint ${status.replace('_', ' ')}`, 'success');
   navigate('complaints');
 }
 
+// Delete complaint
 async function deleteComplaint(id) {
   if (!confirm('Delete this complaint?')) return;
   const success = await DB._deleteItem('complaints', id);
@@ -1664,6 +2112,401 @@ async function deleteComplaint(id) {
       toast('Failed to delete complaint', 'danger');
   }
 }
+
+// ============= ENHANCED BROADCAST FUNCTIONS WITH FILE UPLOAD =============
+
+// Broadcast file upload handlers
+function handleBroadcastFileSelect(event) {
+  const files = event.target.files;
+  handleBroadcastFiles(files);
+}
+
+function handleBroadcastFileDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const files = event.dataTransfer.files;
+  handleBroadcastFiles(files);
+  const dropZone = document.getElementById('broadcastUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleBroadcastDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('broadcastUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--primary)';
+    dropZone.style.background = 'var(--surface-alt)';
+  }
+}
+
+function handleBroadcastDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('broadcastUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleBroadcastFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > 10 * 1024 * 1024) {
+      toast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'danger');
+      continue;
+    }
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      toast(`File "${file.name}" is not a supported format.`, 'warning');
+      continue;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: e.target.result,
+        uploadDate: new Date().toISOString()
+      };
+      uploadedBroadcastFiles.push(fileData);
+      displayBroadcastFileList();
+    };
+    reader.readAsDataURL(file);
+  }
+  const fileInput = document.getElementById('broadcastFileInput');
+  if (fileInput) fileInput.value = '';
+}
+
+function displayBroadcastFileList() {
+  const fileList = document.getElementById('broadcastFileList');
+  if (!fileList) return;
+  
+  fileList.innerHTML = uploadedBroadcastFiles.map((file, index) => {
+    const isImage = file.type && file.type.startsWith('image/');
+    return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--surface-alt); padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border);">
+      ${isImage ? `<img src="${file.data}" style="width:24px; height:24px; object-fit:cover; border-radius:4px;" />` : `<i class="${getFileIcon(file.type)}" style="color:var(--primary);"></i>`}
+      <span style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</span>
+      <span style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeBroadcastFile(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `}).join('');
+}
+
+function removeBroadcastFile(index) {
+  uploadedBroadcastFiles.splice(index, 1);
+  displayBroadcastFileList();
+}
+
+// Enhanced Show Broadcast Modal with File Upload
+async function showBroadcastModal() {
+  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  uploadedBroadcastFiles = [];
+  
+  showModal(`
+    <h3><i class="fas fa-bullhorn"></i> Create Broadcast</h3>
+    <form id="broadcastForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Message <span style="color:var(--danger);">*</span></label>
+        <textarea id="broadcastMessage" rows="5" required 
+          placeholder="Type your announcement here. This will be visible to all users in the selected municipality..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Municipality</label>
+        <select id="broadcastMunicipality">
+            ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Upload Documents & Images</label>
+        <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
+             id="broadcastUploadDropZone" 
+             ondrop="handleBroadcastFileDrop(event)" 
+             ondragover="handleBroadcastDragOver(event)"
+             ondragleave="handleBroadcastDragLeave(event)"
+             onclick="document.getElementById('broadcastFileInput').click()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
+          <p style="margin:0.5rem 0; color:var(--text-muted);">
+            Drag & drop files here or click to browse
+          </p>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Supports: PDF, Word, Excel, PowerPoint, Images (JPG, PNG, GIF) • Max 10MB each
+          </p>
+          <input type="file" id="broadcastFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleBroadcastFileSelect(event)" />
+        </div>
+        <div id="broadcastFileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">
+        <i class="fas fa-bullhorn"></i> Create Broadcast
+      </button>
+    </form>
+  `);
+  
+  byId('broadcastForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const message = byId('broadcastMessage').value.trim();
+    const municipality = byId('broadcastMunicipality').value;
+    
+    if (!message) { toast('Please enter a message', 'danger'); return; }
+    
+    const broadcastData = {
+        message: message,
+        sender: currentUser.name,
+        timestamp: new Date().toISOString(),
+        municipality: municipality,
+        files: uploadedBroadcastFiles
+    };
+    
+    const newBroadcast = await DB.addBroadcast(broadcastData);
+    if (newBroadcast) {
+        closeModal();
+        toast('Broadcast created successfully with ' + uploadedBroadcastFiles.length + ' file(s) attached ✅', 'success');
+        await renderBroadcasts();
+    } else {
+        toast('Failed to create broadcast', 'danger');
+    }
+  });
+}
+
+// Enhanced renderBroadcasts - removed Create Broadcast button from Admin Broadcast card
+async function renderBroadcasts() {
+  const broadcasts = getAllowedItems(await DB.broadcasts());
+  broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer';
+  
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-bullhorn"></i> Announcements</h2>
+      ${isAdmin ? `
+        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
+          <i class="fas fa-plus"></i> New Broadcast
+        </button>
+      ` : ''}
+    </div>
+    
+    <div class="broadcast-list">
+      ${broadcasts.length ? broadcasts.map(b => {
+        const hasFiles = b.files && b.files.length > 0;
+        const images = hasFiles ? b.files.filter(f => f.type && f.type.startsWith('image/')) : [];
+        
+        return `
+        <div class="broadcast-item card" style="
+          border-left:4px solid var(--primary);
+          ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? 'background:var(--surface-alt);' : ''}
+        ">
+          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <strong style="color:var(--primary-dark);">
+              <i class="fas fa-bullhorn"></i> ${b.sender}
+            </strong>
+            <span style="color:var(--text-muted);font-size:0.85rem;">
+              ${formatDate(b.timestamp)}
+            </span>
+          </div>
+          <div style="margin-top:0.75rem;font-size:1.05rem;padding:0.5rem 0;">
+            ${b.message}
+          </div>
+          ${hasFiles ? `
+            <div style="margin-top:0.5rem;">
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                ${images.slice(0, 4).map(file => `
+                  <div style="width:40px; height:40px; border-radius:4px; overflow:hidden; border:1px solid var(--border); cursor:pointer;"
+                       onclick="viewBroadcastFiles(${b.id})">
+                    <img src="${file.data}" style="width:100%; height:100%; object-fit:cover;" />
+                  </div>
+                `).join('')}
+                ${b.files.length > 4 ? `
+                  <span class="file-tag" style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--surface-alt); padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid var(--border); cursor:pointer;" onclick="viewBroadcastFiles(${b.id})">
+                    +${b.files.length - 4} more
+                  </span>
+                ` : ''}
+                <span class="file-tag" style="display:inline-flex; align-items:center; gap:0.3rem; background:var(--surface-alt); padding:0.2rem 0.6rem; border-radius:12px; font-size:0.75rem; border:1px solid var(--border); cursor:pointer;" onclick="viewBroadcastFiles(${b.id})">
+                  <i class="fas fa-paperclip" style="font-size:0.7rem;"></i>
+                  ${b.files.length} files
+                </span>
+              </div>
+            </div>
+          ` : ''}
+          <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.85rem;">
+            ${getMunicipalityLabel(b.municipality)}
+            ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? ' • <span style="color:var(--primary);font-weight:600;">New</span>' : ''}
+          </div>
+          ${isAdmin ? `
+            <div style="margin-top:0.75rem;">
+              <button class="btn btn-danger btn-sm" onclick="deleteBroadcast(${b.id})">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `}).join('') : '<div class="card text-center text-muted">No announcements available.</div>'}
+    </div>
+  `);
+}
+
+// View broadcast files
+async function viewBroadcastFiles(id) {
+  const broadcasts = await DB.broadcasts();
+  const broadcast = broadcasts.find(item => item.id === id);
+  if (!broadcast || !broadcast.files || broadcast.files.length === 0) {
+    toast('No files attached to this broadcast', 'info');
+    return;
+  }
+
+  const images = broadcast.files.filter(f => f.type && f.type.startsWith('image/'));
+  const documents = broadcast.files.filter(f => f.type && !f.type.startsWith('image/'));
+
+  showModal(`
+    <h3><i class="fas fa-paperclip"></i> Files: Broadcast</h3>
+    <div style="margin-bottom:1rem; color:var(--text-muted);">
+      <span class="badge badge-info">${broadcast.files.length} files</span>
+      ${images.length > 0 ? `<span class="badge badge-success">${images.length} images</span>` : ''}
+      ${documents.length > 0 ? `<span class="badge badge-warning">${documents.length} documents</span>` : ''}
+    </div>
+    
+    ${images.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-images"></i> Images (${images.length})
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:0.75rem;">
+          ${images.map((file, index) => `
+            <div style="position:relative; cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--border); transition:all 0.3s;" 
+                 onclick="previewBroadcastFile(${id}, ${broadcast.files.indexOf(file)})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.transform='scale(1.02)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.transform='scale(1)';">
+              <img src="${file.data}" style="width:100%; height:120px; object-fit:cover;" />
+              <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.6); color:white; padding:0.25rem 0.5rem; font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${file.name}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    ${documents.length > 0 ? `
+      <div style="margin-bottom:1.5rem;">
+        <div class="card-title" style="font-size:0.9rem; color:var(--primary);">
+          <i class="fas fa-file-alt"></i> Documents (${documents.length})
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          ${documents.map((file, index) => {
+            const fileIndex = broadcast.files.indexOf(file);
+            return `
+            <div style="display:flex; align-items:center; gap:0.75rem; background:var(--surface-alt); padding:0.75rem; border-radius:8px; border:1px solid var(--border); cursor:pointer; transition:all 0.3s;"
+                 onclick="previewBroadcastFile(${id}, ${fileIndex})"
+                 onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface)';"
+                 onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface-alt)';">
+              <i class="${getFileIcon(file.type)}" style="font-size:2rem; color:var(--primary);"></i>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:500; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${file.name}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); downloadBroadcastFile(${id}, ${fileIndex})">
+                <i class="fas fa-download"></i>
+              </button>
+            </div>
+          `}).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    <button class="btn btn-outline btn-block" style="margin-top:0.5rem;" onclick="closeModal()">Close</button>
+  `);
+}
+
+// Preview broadcast file
+function previewBroadcastFile(broadcastId, fileIndex) {
+  const broadcasts = (async () => { return await DB.broadcasts(); })();
+  broadcasts.then(broadcastsList => {
+    const broadcast = broadcastsList.find(item => item.id === broadcastId);
+    if (!broadcast || !broadcast.files || !broadcast.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = broadcast.files[fileIndex];
+    const isImage = file.type && file.type.startsWith('image/');
+    
+    showModal(`
+      <div style="text-align:center;">
+        <h3 style="margin-bottom:0.5rem;">${file.name}</h3>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+          ${formatFileSize(file.size)} • ${file.type || 'Unknown type'}
+        </div>
+        ${isImage ? `
+          <img src="${file.data}" style="max-width:100%; max-height:70vh; border-radius:8px; border:1px solid var(--border);" />
+        ` : `
+          <div style="padding:2rem; background:var(--surface-alt); border-radius:12px; border:1px solid var(--border);">
+            <i class="${getFileIcon(file.type)}" style="font-size:4rem; color:var(--primary);"></i>
+            <p style="margin-top:1rem; color:var(--text-muted);">
+              This file type cannot be previewed directly.
+            </p>
+            <button class="btn btn-primary" onclick="closeModal(); downloadBroadcastFile(${broadcastId}, ${fileIndex});">
+              <i class="fas fa-download"></i> Download File
+            </button>
+          </div>
+        `}
+        <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+          ${isImage ? `
+            <button class="btn btn-primary btn-sm" onclick="downloadBroadcastFile(${broadcastId}, ${fileIndex})">
+              <i class="fas fa-download"></i> Download
+            </button>
+          ` : ''}
+          <button class="btn btn-outline btn-sm" onclick="closeModal(); viewBroadcastFiles(${broadcastId});">
+            <i class="fas fa-arrow-left"></i> Back to Files
+          </button>
+        </div>
+      </div>
+    `);
+  });
+}
+
+// Download broadcast file
+function downloadBroadcastFile(broadcastId, fileIndex) {
+  const broadcasts = (async () => { return await DB.broadcasts(); })();
+  broadcasts.then(broadcastsList => {
+    const broadcast = broadcastsList.find(item => item.id === broadcastId);
+    if (!broadcast || !broadcast.files || !broadcast.files[fileIndex]) {
+      toast('File not found', 'danger');
+      return;
+    }
+    const file = broadcast.files[fileIndex];
+    const link = document.createElement('a');
+    link.href = file.data;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast(`Downloading: ${file.name}`, 'success');
+  });
+}
+
+// Delete broadcast
+async function deleteBroadcast(id) {
+  if (!confirm('Delete this broadcast?')) return;
+  const success = await DB._deleteItem('broadcasts', id);
+  if (success) {
+      toast('Broadcast deleted', 'success');
+      await renderBroadcasts();
+  } else {
+      toast('Failed to delete broadcast', 'danger');
+  }
+}
+
+// ============= REST OF THE CODE (Documents, Users, Track Users, Emails, Shared Functions) =============
 
 async function renderDocuments() {
   const documents = getAllowedItems(await DB.documents());
@@ -1838,7 +2681,7 @@ async function renderTrackUsers() {
 }
 
 async function showAddUserModal() {
-  const roles = ['super_admin', 'municipal_officer', 'member'];
+  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
     <h3><i class="fas fa-user-plus"></i> Create User Account</h3>
@@ -1888,7 +2731,7 @@ async function editUser(id) {
 }
 
 function showEditUserModal(user) {
-  const roles = ['super_admin', 'municipal_officer', 'member'];
+  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
     <h3><i class="fas fa-user-edit"></i> Edit User Account</h3>
@@ -2170,127 +3013,6 @@ async function filterEmails(filter, event) {
   }
   
   await filterAndRenderEmails(filter);
-}
-
-// ============= BROADCAST MODULE =============
-async function renderBroadcasts() {
-  const broadcasts = getAllowedItems(await DB.broadcasts());
-  broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  
-  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer';
-  
-  render(`
-    <div class="page-header">
-      <h2><i class="fas fa-bullhorn"></i> Announcements</h2>
-      ${isAdmin ? `
-        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
-          <i class="fas fa-plus"></i> New Broadcast
-        </button>
-      ` : ''}
-    </div>
-    
-    ${isAdmin ? `
-      <div class="card" style="background:var(--surface-alt);border:2px dashed var(--border);">
-        <div class="card-title"><i class="fas fa-bullhorn"></i> Admin Broadcast</div>
-        <p style="color:var(--text-muted);margin-bottom:1rem;">
-          Send a message that will be visible to all users on their dashboard.
-        </p>
-        <button class="btn btn-primary btn-sm" onclick="showBroadcastModal()">
-          <i class="fas fa-bullhorn"></i> Create Broadcast
-        </button>
-      </div>
-    ` : ''}
-    
-    <div class="broadcast-list">
-      ${broadcasts.length ? broadcasts.map(b => `
-        <div class="broadcast-item card" style="
-          border-left:4px solid var(--primary);
-          ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? 'background:var(--surface-alt);' : ''}
-        ">
-          <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-            <strong style="color:var(--primary-dark);">
-              <i class="fas fa-bullhorn"></i> ${b.sender}
-            </strong>
-            <span style="color:var(--text-muted);font-size:0.85rem;">
-              ${formatDate(b.timestamp)}
-            </span>
-          </div>
-          <div style="margin-top:0.75rem;font-size:1.05rem;padding:0.5rem 0;">
-            ${b.message}
-          </div>
-          <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.85rem;">
-            ${getMunicipalityLabel(b.municipality)}
-            ${new Date(b.timestamp) > new Date(Date.now() - 86400000) ? ' • <span style="color:var(--primary);font-weight:600;">New</span>' : ''}
-          </div>
-          ${isAdmin ? `
-            <div style="margin-top:0.75rem;">
-              <button class="btn btn-danger btn-sm" onclick="deleteBroadcast(${b.id})">
-                <i class="fas fa-trash"></i> Delete
-              </button>
-            </div>
-          ` : ''}
-        </div>
-      `).join('') : '<div class="card text-center text-muted">No announcements available.</div>'}
-    </div>
-  `);
-}
-
-async function showBroadcastModal() {
-  const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
-  
-  showModal(`
-    <h3><i class="fas fa-bullhorn"></i> Create Broadcast</h3>
-    <form id="broadcastForm">
-      <div class="form-group">
-        <label>Message</label>
-        <textarea id="broadcastMessage" rows="5" required 
-          placeholder="Type your announcement here. This will be visible to all users in the selected municipality..."></textarea>
-      </div>
-      <div class="form-group">
-        <label>Municipality</label>
-        <select id="broadcastMunicipality">
-            ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
-        </select>
-      </div>
-      <button type="submit" class="btn btn-primary btn-block">
-        <i class="fas fa-bullhorn"></i> Create Broadcast
-      </button>
-    </form>
-  `);
-  
-  byId('broadcastForm').addEventListener('submit', async function (event) {
-    event.preventDefault();
-    const message = byId('broadcastMessage').value.trim();
-    const municipality = byId('broadcastMunicipality').value;
-    
-    if (!message) { toast('Please enter a message', 'danger'); return; }
-    
-    const newBroadcast = await DB.addBroadcast({
-        message: message,
-        sender: currentUser.name,
-        timestamp: new Date().toISOString(),
-        municipality: municipality
-    });
-    
-    if (newBroadcast) {
-        closeModal();
-        toast('Broadcast created successfully', 'success');
-        await renderBroadcasts();
-    } else {
-        toast('Failed to create broadcast', 'danger');
-    }
-  });
-}
-
-async function deleteBroadcast(id) {
-  if (!confirm('Delete this broadcast?')) return;
-  const success = await DB._deleteItem('broadcasts', id);
-  if (success) {
-      toast('Broadcast deleted', 'success');
-      await renderBroadcasts();
-  } else {
-      toast('Failed to delete broadcast', 'danger');
-  }
 }
 
 // ============= SHARED FUNCTIONS =============
@@ -2690,6 +3412,10 @@ window.viewMeetingFiles = viewMeetingFiles;
 window.downloadMeetingFile = downloadMeetingFile;
 window.previewFile = previewFile;
 window.showUploadMinutesModal = showUploadMinutesModal;
+window.viewMinutesFiles = viewMinutesFiles;
+window.previewMinutesFile = previewMinutesFile;
+window.downloadMinutesFile = downloadMinutesFile;
+window.deleteMinute = deleteMinute;
 window.showAddComplaintModal = showAddComplaintModal;
 window.assignComplaint = assignComplaint;
 window.updateComplaintStatus = updateComplaintStatus;
@@ -2715,6 +3441,9 @@ window.filterEmails = filterEmails;
 window.renderBroadcasts = renderBroadcasts;
 window.showBroadcastModal = showBroadcastModal;
 window.deleteBroadcast = deleteBroadcast;
+window.viewBroadcastFiles = viewBroadcastFiles;
+window.previewBroadcastFile = previewBroadcastFile;
+window.downloadBroadcastFile = downloadBroadcastFile;
 window.renderTrackUsers = renderTrackUsers;
 window.showCreateAccountModal = showCreateAccountModal;
 window.loginWithGoogle = loginWithGoogle;
@@ -2730,5 +3459,15 @@ window.handleFileDrop = handleFileDrop;
 window.handleDragOver = handleDragOver;
 window.handleDragLeave = handleDragLeave;
 window.removeFile = removeFile;
+window.handleMinutesFileSelect = handleMinutesFileSelect;
+window.handleMinutesFileDrop = handleMinutesFileDrop;
+window.handleMinutesDragOver = handleMinutesDragOver;
+window.handleMinutesDragLeave = handleMinutesDragLeave;
+window.removeMinutesFile = removeMinutesFile;
+window.handleBroadcastFileSelect = handleBroadcastFileSelect;
+window.handleBroadcastFileDrop = handleBroadcastFileDrop;
+window.handleBroadcastDragOver = handleBroadcastDragOver;
+window.handleBroadcastDragLeave = handleBroadcastDragLeave;
+window.removeBroadcastFile = removeBroadcastFile;
 
 window.addEventListener('DOMContentLoaded', boot);

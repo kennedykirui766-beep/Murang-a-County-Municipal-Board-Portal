@@ -67,7 +67,6 @@ def oauth_login():
     user = User.query.filter_by(email=email).first()
     
     if not user:
-        # Create user if they don't exist
         random_pass = secrets.token_urlsafe(16)
         user = User(
             name=name,
@@ -79,7 +78,6 @@ def oauth_login():
         )
         db.session.add(user)
         
-        # Also add to members table
         new_member = Member(
             name=name,
             email=email,
@@ -111,11 +109,6 @@ def heartbeat():
 
 @app.route('/api/register', methods=['POST'])
 def register():
-    """
-    Public registration endpoint.
-    Allows anyone to create an account, but the role is forced to 'member'
-    and they cannot gain admin privileges.
-    """
     from models import User
     
     data = request.json
@@ -130,7 +123,7 @@ def register():
         name=data.get('name'),
         email=email,
         password=hashed_password,
-        role='member', # Force 'member' role for public registration
+        role='member',
         municipality=data.get('municipality'),
         last_seen=''
     )
@@ -163,25 +156,17 @@ def get_entity(entity):
 
 @app.route('/api/<entity>', methods=['POST'])
 def add_entity_item(entity):
-    """
-    Generic add endpoint. 
-    NOTE: For 'users', this is for the Super Admin to create accounts.
-    Public registration uses /api/register.
-    """
     Model = get_model(entity)
     if not Model: 
         return jsonify({'error': 'Entity not found'}), 404
     
     data = request.json
     
-    # Hash password if creating a user
     if entity == 'users':
         data['password'] = generate_password_hash(data.get('password'))
         data['last_seen'] = ''
     
-    # Handle meeting fields
     if entity == 'meetings':
-        # Handle attendees
         attendees = data.get('attendees', [])
         if isinstance(attendees, list):
             data['attendees'] = json.dumps(attendees)
@@ -194,7 +179,6 @@ def add_entity_item(entity):
         else:
             data['attendees'] = json.dumps([])
         
-        # Handle declined
         declined = data.get('declined', [])
         if isinstance(declined, list):
             data['declined'] = json.dumps(declined)
@@ -207,7 +191,6 @@ def add_entity_item(entity):
         else:
             data['declined'] = json.dumps([])
         
-        # Handle files
         files = data.get('files', [])
         if isinstance(files, list):
             data['files'] = json.dumps(files)
@@ -220,9 +203,45 @@ def add_entity_item(entity):
         else:
             data['files'] = json.dumps([])
         
-        # Ensure description is set
         if 'description' not in data:
             data['description'] = ''
+    
+    if entity == 'minutes':
+        files = data.get('files', [])
+        if isinstance(files, list):
+            data['files'] = json.dumps(files)
+        elif isinstance(files, str):
+            try:
+                json.loads(files)
+                data['files'] = files
+            except:
+                data['files'] = json.dumps([])
+        else:
+            data['files'] = json.dumps([])
+        
+        if 'title' not in data:
+            data['title'] = ''
+        if 'summary' not in data:
+            data['summary'] = ''
+
+    if entity == 'complaints':
+        if 'assignedToRole' not in data:
+            data['assignedToRole'] = ''
+        if 'submittedBy' not in data:
+            data['submittedBy'] = data.get('submittedBy', 'Unknown User')
+    
+    if entity == 'broadcasts':
+        files = data.get('files', [])
+        if isinstance(files, list):
+            data['files'] = json.dumps(files)
+        elif isinstance(files, str):
+            try:
+                json.loads(files)
+                data['files'] = files
+            except:
+                data['files'] = json.dumps([])
+        else:
+            data['files'] = json.dumps([])
 
     new_item = Model(**data)
     db.session.add(new_item)
@@ -242,13 +261,10 @@ def update_entity_item(entity, item_id):
 
     updated_data = request.json
 
-    # If updating a user's password, hash it. 
     if entity == 'users' and 'password' in updated_data and updated_data['password']:
         updated_data['password'] = generate_password_hash(updated_data['password'])
 
-    # Handle meeting fields
     if entity == 'meetings':
-        # Handle attendees
         if 'attendees' in updated_data:
             attendees = updated_data['attendees']
             if isinstance(attendees, list):
@@ -262,7 +278,6 @@ def update_entity_item(entity, item_id):
             else:
                 updated_data['attendees'] = json.dumps([])
         
-        # Handle declined
         if 'declined' in updated_data:
             declined = updated_data['declined']
             if isinstance(declined, list):
@@ -276,7 +291,34 @@ def update_entity_item(entity, item_id):
             else:
                 updated_data['declined'] = json.dumps([])
         
-        # Handle files
+        if 'files' in updated_data:
+            files = updated_data['files']
+            if isinstance(files, list):
+                updated_data['files'] = json.dumps(files)
+            elif isinstance(files, str):
+                try:
+                    json.loads(files)
+                    updated_data['files'] = files
+                except:
+                    updated_data['files'] = json.dumps([])
+            else:
+                updated_data['files'] = json.dumps([])
+    
+    if entity == 'minutes':
+        if 'files' in updated_data:
+            files = updated_data['files']
+            if isinstance(files, list):
+                updated_data['files'] = json.dumps(files)
+            elif isinstance(files, str):
+                try:
+                    json.loads(files)
+                    updated_data['files'] = files
+                except:
+                    updated_data['files'] = json.dumps([])
+            else:
+                updated_data['files'] = json.dumps([])
+    
+    if entity == 'broadcasts':
         if 'files' in updated_data:
             files = updated_data['files']
             if isinstance(files, list):
@@ -290,21 +332,16 @@ def update_entity_item(entity, item_id):
             else:
                 updated_data['files'] = json.dumps([])
 
-    # Update only the fields that were provided
     for key, value in updated_data.items():
         if hasattr(item, key) and key != 'id':
             setattr(item, key, value)
             
     db.session.commit()
     
-    # Return the updated item
     return jsonify(item.to_dict()), 200
 
 @app.route('/api/<entity>/<int:item_id>', methods=['DELETE'])
 def delete_entity_item(entity, item_id):
-    """
-    Deletes a single item from the database.
-    """
     Model = get_model(entity)
     if not Model:
         return jsonify({'error': 'Entity not found'}), 404
@@ -326,7 +363,6 @@ def replace_entity_list(entity):
     
     new_list_data = request.json
     
-    # Delete all existing records
     Model.query.delete()
     db.session.commit()
     
@@ -337,30 +373,51 @@ def replace_entity_list(entity):
             if 'last_seen' not in item_data:
                 item_data['last_seen'] = ''
         if entity == 'meetings':
-            # Ensure attendees is JSON string
             attendees = item_data.get('attendees', [])
             if isinstance(attendees, list):
                 item_data['attendees'] = json.dumps(attendees)
             elif not isinstance(attendees, str):
                 item_data['attendees'] = json.dumps([])
             
-            # Ensure declined is JSON string
             declined = item_data.get('declined', [])
             if isinstance(declined, list):
                 item_data['declined'] = json.dumps(declined)
             elif not isinstance(declined, str):
                 item_data['declined'] = json.dumps([])
             
-            # Ensure files is JSON string
             files = item_data.get('files', [])
             if isinstance(files, list):
                 item_data['files'] = json.dumps(files)
             elif not isinstance(files, str):
                 item_data['files'] = json.dumps([])
             
-            # Ensure description exists
             if 'description' not in item_data:
                 item_data['description'] = ''
+        
+        if entity == 'minutes':
+            files = item_data.get('files', [])
+            if isinstance(files, list):
+                item_data['files'] = json.dumps(files)
+            elif not isinstance(files, str):
+                item_data['files'] = json.dumps([])
+            
+            if 'title' not in item_data:
+                item_data['title'] = ''
+            if 'summary' not in item_data:
+                item_data['summary'] = ''
+        
+        if entity == 'complaints':
+            if 'assignedToRole' not in item_data:
+                item_data['assignedToRole'] = ''
+            if 'submittedBy' not in item_data:
+                item_data['submittedBy'] = 'Unknown User'
+        
+        if entity == 'broadcasts':
+            files = item_data.get('files', [])
+            if isinstance(files, list):
+                item_data['files'] = json.dumps(files)
+            elif not isinstance(files, str):
+                item_data['files'] = json.dumps([])
                 
         new_items.append(Model(**item_data))
         

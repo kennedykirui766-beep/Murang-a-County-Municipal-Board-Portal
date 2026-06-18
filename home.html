@@ -28,7 +28,10 @@
 
   <div id="app" class="active">
     <nav class="navbar">
-      <div class="brand"><i class="fas fa-landmark"></i> Murang'a Board Portal</div>
+      <div class="brand">
+        <img src="logo.png" alt="Murang'a County Logo" class="nav-logo" />
+        <span>Murang'a Board Portal</span>
+      </div>
       <div class="nav-actions">
         <span class="user-badge"><i class="fas fa-user-circle"></i> <span id="navUserName">User</span> (<span id="navUserRole">role</span>)</span>
         <span class="user-badge" style="background:var(--gray-200);color:var(--gray-700);" id="navMunicipality">Municipality</span>
@@ -38,6 +41,11 @@
 
     <div class="app-body">
       <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <img src="logo.png" alt="Murang'a County Logo" class="sidebar-logo" />
+          <h2>Municipal Board</h2>
+          <span class="sidebar-subtitle">Murang'a County</span>
+        </div>
         <div class="nav-section">Main</div>
         <div class="nav-item active" data-page="dashboard"><i class="fas fa-chart-pie"></i> Dashboard</div>
         <div class="nav-item" data-page="members"><i class="fas fa-users"></i> Members</div>
@@ -46,7 +54,7 @@
         <div class="nav-item" data-page="complaints"><i class="fas fa-exclamation-triangle"></i> Complaints</div>
         <div class="nav-item" data-page="documents"><i class="fas fa-folder-open"></i> Documents</div>
         <div class="nav-item" data-page="emails"><i class="fas fa-envelope"></i> Email</div>
-          <div class="nav-section">System</div>
+        <div class="nav-section">System</div>
         <div class="nav-item" data-page="users" id="navUsers"><i class="fas fa-user-cog"></i> Manage Users</div>
         <div class="nav-item" data-page="track" id="navTrack" style="display:none;"><i class="fas fa-map-marker-alt"></i> Track Users</div>
         <div class="nav-item" data-page="broadcasts"><i class="fas fa-bullhorn"></i> Announcements</div>

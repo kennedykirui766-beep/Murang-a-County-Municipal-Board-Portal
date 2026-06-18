@@ -80,6 +80,8 @@ class Complaint(db.Model):
     municipality = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(50), nullable=False)
     assignedTo = db.Column(db.String(100), default='')
+    assignedToRole = db.Column(db.String(50), default='')
+    submittedBy = db.Column(db.String(100), nullable=False)
     date = db.Column(db.String, nullable=False)
 
     def to_dict(self):
@@ -90,6 +92,8 @@ class Complaint(db.Model):
             'municipality': self.municipality,
             'status': self.status,
             'assignedTo': self.assignedTo,
+            'assignedToRole': self.assignedToRole,
+            'submittedBy': self.submittedBy,
             'date': self.date
         }
 
@@ -97,14 +101,14 @@ class Complaint(db.Model):
 class Minute(db.Model):
     __tablename__ = 'minutes'
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), default='')  # NEW: Title of minutes
-    summary = db.Column(db.Text, default='')       # NEW: Summary of minutes
+    title = db.Column(db.String(200), default='')
+    summary = db.Column(db.Text, default='')
     meetingId = db.Column(db.Integer, nullable=True)
     content = db.Column(db.Text, nullable=False)
     uploadedBy = db.Column(db.String(100), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
     uploadDate = db.Column(db.String, nullable=False)
-    files = db.Column(db.Text, default='[]')      # NEW: Store file data as JSON
+    files = db.Column(db.Text, default='[]')
 
     def to_dict(self):
         d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -168,12 +172,12 @@ class Broadcast(db.Model):
     sender = db.Column(db.String(100), nullable=False)
     timestamp = db.Column(db.String, nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
+    files = db.Column(db.Text, default='[]')  # NEW: Store file data as JSON
 
     def to_dict(self):
-        return {
-            'id': self.id,
-            'message': self.message,
-            'sender': self.sender,
-            'timestamp': self.timestamp,
-            'municipality': self.municipality
-        }
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        try:
+            d['files'] = json.loads(d['files']) if d['files'] else []
+        except:
+            d['files'] = []
+        return d

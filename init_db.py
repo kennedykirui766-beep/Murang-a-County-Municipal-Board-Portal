@@ -10,7 +10,6 @@ def seed_database():
         print("Creating database tables if they don't exist...")
         db.create_all()
 
-        # --- SAFE CHECK: Only seed if the User table is completely empty. ---
         if User.query.first():
             print("Database already contains users. Skipping seeding to protect your data.")
             print("If you want to reset the database, you must delete the 'municipal_board.db' file first.")
@@ -19,7 +18,7 @@ def seed_database():
         print("Database is empty. Seeding initial data...")
         today = str(date.today())
 
-        # --- 1. The Super Admin (Developer) ---
+        # --- Users ---
         super_admin = User(
             name='Super Developer', 
             email='dev@muranga.go.ke', 
@@ -29,7 +28,6 @@ def seed_database():
             last_seen=''
         )
 
-        # --- 2. The Three Municipal Officers ---
         officers_data = [
             User(
                 name='Kenol Municipal Officer', 
@@ -57,7 +55,60 @@ def seed_database():
             )
         ]
 
-        # --- 3. A sample member ---
+        social_officers_data = [
+            User(
+                name='Kenol Social Officer',
+                email='social.kenol@muranga.go.ke',
+                password=generate_password_hash('social123'),
+                role='social_officer',
+                municipality='kenol',
+                last_seen=''
+            ),
+            User(
+                name='Kangare Social Officer',
+                email='social.kangare@muranga.go.ke',
+                password=generate_password_hash('social123'),
+                role='social_officer',
+                municipality='kangare',
+                last_seen=''
+            ),
+            User(
+                name="Murang'a Town Social Officer",
+                email='social.muranga@muranga.go.ke',
+                password=generate_password_hash('social123'),
+                role='social_officer',
+                municipality='muranga_town',
+                last_seen=''
+            )
+        ]
+
+        department_officers_data = [
+            User(
+                name='Kenol Department Officer',
+                email='dept.kenol@muranga.go.ke',
+                password=generate_password_hash('dept123'),
+                role='department_officer',
+                municipality='kenol',
+                last_seen=''
+            ),
+            User(
+                name='Kangare Department Officer',
+                email='dept.kangare@muranga.go.ke',
+                password=generate_password_hash('dept123'),
+                role='department_officer',
+                municipality='kangare',
+                last_seen=''
+            ),
+            User(
+                name="Murang'a Town Department Officer",
+                email='dept.muranga@muranga.go.ke',
+                password=generate_password_hash('dept123'),
+                role='department_officer',
+                municipality='muranga_town',
+                last_seen=''
+            )
+        ]
+
         sample_member = User(
             name='Jane Citizen', 
             email='jane@citizen.go.ke', 
@@ -69,20 +120,24 @@ def seed_database():
 
         db.session.add(super_admin)
         db.session.add_all(officers_data)
+        db.session.add_all(social_officers_data)
+        db.session.add_all(department_officers_data)
         db.session.add(sample_member)
 
-        # --- Other Seeded Data ---
+        # --- Members ---
         members_data = [
             Member(name='Jane Citizen', email='jane@citizen.go.ke', role='member', municipality='kenol', joined=today),
-            Member(name='John Doe', email='john@doe.go.ke', role='member', municipality='kangare', joined=today)
+            Member(name='John Doe', email='john@doe.go.ke', role='member', municipality='kangare', joined=today),
+            Member(name='Kenol Social Officer', email='social.kenol@muranga.go.ke', role='social_officer', municipality='kenol', joined=today),
+            Member(name='Kenol Department Officer', email='dept.kenol@muranga.go.ke', role='department_officer', municipality='kenol', joined=today)
         ]
         db.session.add_all(members_data)
 
-        # --- Meetings with description and files ---
+        # --- Meetings ---
         meetings_data = [
             Meeting(
                 title='Kenol Budget Meeting',
-                description='Annual budget review and planning for Kenol municipality. Key agenda items: Infrastructure development, Community projects, and Revenue collection.',
+                description='Annual budget review and planning for Kenol municipality.',
                 date='2026-06-20',
                 time='10:00',
                 location='Kenol Hall',
@@ -94,7 +149,7 @@ def seed_database():
             ),
             Meeting(
                 title='Kangare Development Forum',
-                description='Discussion on community development projects, water supply improvements, and road maintenance in Kangare area.',
+                description='Discussion on community development projects in Kangare area.',
                 date='2026-06-22',
                 time='14:00',
                 location='Kangare Centre',
@@ -106,7 +161,7 @@ def seed_database():
             ),
             Meeting(
                 title="Murang'a Town Council",
-                description='Town council meeting to discuss urban planning, waste management, and business licensing in Murang\'a Town.',
+                description='Town council meeting to discuss urban planning and waste management.',
                 date='2026-06-25',
                 time='09:30',
                 location='Town Hall',
@@ -119,6 +174,31 @@ def seed_database():
         ]
         db.session.add_all(meetings_data)
 
+        # --- Minutes ---
+        minutes_data = [
+            Minute(
+                title='Kenol Budget Meeting Minutes',
+                summary='Key decisions: Approved budget allocation for infrastructure projects.',
+                meetingId=1,
+                content='The Kenol Budget Meeting was held on June 20, 2026. All members were present.',
+                uploadedBy='Super Developer',
+                municipality='kenol',
+                uploadDate=today,
+                files=json.dumps([])
+            ),
+            Minute(
+                title='Kangare Development Forum Minutes',
+                summary='Discussion on water supply improvements and road maintenance projects.',
+                meetingId=2,
+                content='The Kangare Development Forum meeting discussed community development projects.',
+                uploadedBy='Super Developer',
+                municipality='kangare',
+                uploadDate=today,
+                files=json.dumps([])
+            )
+        ]
+        db.session.add_all(minutes_data)
+
         # --- Complaints ---
         complaints_data = [
             Complaint(
@@ -127,14 +207,28 @@ def seed_database():
                 municipality='kenol',
                 status='pending',
                 assignedTo='',
+                assignedToRole='',
+                submittedBy='Jane Citizen',
                 date=today
             ),
             Complaint(
                 title='Water shortage Kangare',
-                description='Irregular water supply in Kangare estate for the past two weeks. Residents are facing severe water shortages.',
+                description='Irregular water supply in Kangare estate for the past two weeks.',
                 municipality='kangare',
                 status='in_progress',
                 assignedTo='Kenol Municipal Officer',
+                assignedToRole='municipal_officer',
+                submittedBy='John Doe',
+                date=today
+            ),
+            Complaint(
+                title="Murang'a Town Waste Management",
+                description='Poor waste collection services in Murang\'a Town.',
+                municipality='muranga_town',
+                status='pending',
+                assignedTo='',
+                assignedToRole='',
+                submittedBy='Jane Citizen',
                 date=today
             )
         ]
@@ -146,7 +240,7 @@ def seed_database():
                 from_email='system@muranga.go.ke',
                 to_email='admin@muranga.go.ke',
                 subject='Welcome to the Municipal Board Portal',
-                body='Welcome to the Murang\'a County Municipal Board Portal. This system helps manage board activities, meetings, complaints, and communications.',
+                body='Welcome to the Murang\'a County Municipal Board Portal.',
                 timestamp=(datetime.utcnow() - timedelta(days=1)).isoformat(),
                 read=False,
                 municipality='all'
@@ -155,7 +249,7 @@ def seed_database():
                 from_email='kenol@muranga.go.ke',
                 to_email='admin@muranga.go.ke',
                 subject='Kenol Budget Meeting Update',
-                body='The Kenol budget meeting scheduled for June 20th has been confirmed. All board members are requested to attend.',
+                body='The Kenol budget meeting scheduled for June 20th has been confirmed.',
                 timestamp=(datetime.utcnow() - timedelta(hours=12)).isoformat(),
                 read=False,
                 municipality='kenol'
@@ -164,7 +258,7 @@ def seed_database():
                 from_email='social@muranga.go.ke',
                 to_email='all',
                 subject='Community Outreach Program',
-                body='The social department is organizing a community outreach program next month. We request all municipalities to participate.',
+                body='The social department is organizing a community outreach program next month.',
                 timestamp=(datetime.utcnow() - timedelta(hours=6)).isoformat(),
                 read=False,
                 municipality='all'
@@ -172,19 +266,21 @@ def seed_database():
         ]
         db.session.add_all(emails_data)
 
-        # --- Broadcasts ---
+        # --- Broadcasts with files field ---
         broadcasts_data = [
             Broadcast(
                 message='Welcome to the Murang\'a County Municipal Board Portal! Please familiarize yourself with the system.',
                 sender='System Admin',
                 timestamp=(datetime.utcnow() - timedelta(days=2)).isoformat(),
-                municipality='all'
+                municipality='all',
+                files=json.dumps([])
             ),
             Broadcast(
                 message='Important: The upcoming budget review meeting for all municipalities has been rescheduled to July 5th.',
                 sender='System Admin',
                 timestamp=(datetime.utcnow() - timedelta(days=1)).isoformat(),
-                municipality='all'
+                municipality='all',
+                files=json.dumps([])
             )
         ]
         db.session.add_all(broadcasts_data)
@@ -215,6 +311,8 @@ def seed_database():
         print("--- CREDENTIALS ---")
         print(f"Super Admin: dev@muranga.go.ke / dev123")
         print("Municipal Officers: officer.[municipality]@muranga.go.ke / officer123")
+        print("Social Officers: social.[municipality]@muranga.go.ke / social123")
+        print("Department Officers: dept.[municipality]@muranga.go.ke / dept123")
         print("Sample Member: jane@citizen.go.ke / member123")
         print("-------------------")
 
