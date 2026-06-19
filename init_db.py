@@ -17,17 +17,26 @@ def seed_database():
 
         print("Database is empty. Seeding initial data...")
         today = str(date.today())
+        now = datetime.utcnow().isoformat()
 
-        # --- Users ---
+        # --- Super Admin (Auto-approved) ---
         super_admin = User(
             name='Super Developer', 
             email='dev@muranga.go.ke', 
             password=generate_password_hash('dev123'), 
             role='super_admin', 
             municipality='all',
-            last_seen=''
+            last_seen='',
+            is_approved=True,
+            approved_by='System',
+            approved_date=now,
+            registration_date=now,
+            is_rejected=False,
+            rejected_by='',
+            rejected_date=''
         )
 
+        # --- Municipal Officers (Auto-approved) ---
         officers_data = [
             User(
                 name='Kenol Municipal Officer', 
@@ -35,7 +44,14 @@ def seed_database():
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
                 municipality='kenol',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name='Kangare Municipal Officer', 
@@ -43,7 +59,14 @@ def seed_database():
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
                 municipality='kangare',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name="Murang'a Town Municipal Officer", 
@@ -51,10 +74,18 @@ def seed_database():
                 password=generate_password_hash('officer123'), 
                 role='municipal_officer', 
                 municipality='muranga_town',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             )
         ]
 
+        # --- Social Officers (Auto-approved) ---
         social_officers_data = [
             User(
                 name='Kenol Social Officer',
@@ -62,7 +93,14 @@ def seed_database():
                 password=generate_password_hash('social123'),
                 role='social_officer',
                 municipality='kenol',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name='Kangare Social Officer',
@@ -70,7 +108,14 @@ def seed_database():
                 password=generate_password_hash('social123'),
                 role='social_officer',
                 municipality='kangare',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name="Murang'a Town Social Officer",
@@ -78,10 +123,18 @@ def seed_database():
                 password=generate_password_hash('social123'),
                 role='social_officer',
                 municipality='muranga_town',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             )
         ]
 
+        # --- Department Officers (Auto-approved) ---
         department_officers_data = [
             User(
                 name='Kenol Department Officer',
@@ -89,7 +142,14 @@ def seed_database():
                 password=generate_password_hash('dept123'),
                 role='department_officer',
                 municipality='kenol',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name='Kangare Department Officer',
@@ -97,7 +157,14 @@ def seed_database():
                 password=generate_password_hash('dept123'),
                 role='department_officer',
                 municipality='kangare',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             ),
             User(
                 name="Murang'a Town Department Officer",
@@ -105,17 +172,49 @@ def seed_database():
                 password=generate_password_hash('dept123'),
                 role='department_officer',
                 municipality='muranga_town',
-                last_seen=''
+                last_seen='',
+                is_approved=True,
+                approved_by='System',
+                approved_date=now,
+                registration_date=now,
+                is_rejected=False,
+                rejected_by='',
+                rejected_date=''
             )
         ]
 
+        # --- Sample Member (Requires Approval - Pending) ---
         sample_member = User(
             name='Jane Citizen', 
             email='jane@citizen.go.ke', 
             password=generate_password_hash('member123'), 
             role='member', 
             municipality='kenol',
-            last_seen=''
+            last_seen='',
+            is_approved=False,  # Needs approval
+            approved_by='',
+            approved_date='',
+            registration_date=now,
+            is_rejected=False,
+            rejected_by='',
+            rejected_date=''
+        )
+
+        # --- Another Sample Member (Approved) ---
+        approved_member = User(
+            name='John Doe', 
+            email='john@doe.go.ke', 
+            password=generate_password_hash('member456'), 
+            role='member', 
+            municipality='kangare',
+            last_seen='',
+            is_approved=True,  # Already approved
+            approved_by='Super Developer',
+            approved_date=now,
+            registration_date=now,
+            is_rejected=False,
+            rejected_by='',
+            rejected_date=''
         )
 
         db.session.add(super_admin)
@@ -123,6 +222,7 @@ def seed_database():
         db.session.add_all(social_officers_data)
         db.session.add_all(department_officers_data)
         db.session.add(sample_member)
+        db.session.add(approved_member)
 
         # --- Members ---
         members_data = [
@@ -313,8 +413,11 @@ def seed_database():
         print("Municipal Officers: officer.[municipality]@muranga.go.ke / officer123")
         print("Social Officers: social.[municipality]@muranga.go.ke / social123")
         print("Department Officers: dept.[municipality]@muranga.go.ke / dept123")
-        print("Sample Member: jane@citizen.go.ke / member123")
+        print("Sample Member (PENDING): jane@citizen.go.ke / member123")
+        print("Sample Member (APPROVED): john@doe.go.ke / member456")
         print("-------------------")
+        print("NOTE: Members require admin approval before they can login.")
+        print("Admins (Super Admin, Municipal Officers, Social Officers, Department Officers) can login immediately.")
 
 if __name__ == '__main__':
     seed_database()

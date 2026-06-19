@@ -1445,3 +1445,76 @@ tbody tr:hover {
     font-size: 0.8rem;
   }
 }
+
+/* ============= APPROVALS BADGE STYLES ============= */
+
+#approvalsBadge {
+  display: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  margin-left: auto;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Approval Tabs */
+.approval-tabs .btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  transition: all 0.25s ease;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.approval-tabs .btn:hover {
+  background: var(--surface-muted);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.approval-tabs .btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.approval-tabs .btn.active:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.approval-tabs .btn .badge {
+  margin-left: 0.3rem;
+}
+
+/* Approval Table Actions */
+.btn-sm {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-sm:hover {
+  transform: translateY(-1px);
+}
+
+.btn-sm:active {
+  transform: translateY(0px);
+}

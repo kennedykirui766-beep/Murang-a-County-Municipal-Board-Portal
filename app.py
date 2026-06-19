@@ -42,14 +42,44 @@ def login():
     email = credentials.get('email')
     password = credentials.get('password')
     
+    print(f"Login attempt: {email}")
+    print(f"Password length: {len(password) if password else 0}")
+    
     user = User.query.filter_by(email=email).first()
     
-    if user and check_password_hash(user.password, password):
-        user.last_seen = datetime.utcnow().isoformat()
-        db.session.commit()
-        return jsonify(user.to_dict()), 200
-    else:
+    if not user:
+        print(f"User not found: {email}")
         return jsonify({'error': 'Invalid email or password'}), 401
+    
+    print(f"User found: {user.name}, Role: {user.role}, Approved: {user.is_approved}")
+    print(f"Stored password hash length: {len(user.password) if user.password else 0}")
+    print(f"Stored password starts with scrypt: {user.password.startswith('scrypt:') if user.password else False}")
+    
+    # Check password
+    try:
+        is_valid = check_password_hash(user.password, password)
+        print(f"Password check result: {is_valid}")
+    except Exception as e:
+        print(f"Password check error: {str(e)}")
+        return jsonify({'error': 'Login error. Please try again.'}), 500
+    
+    if not is_valid:
+        print(f"Password check failed for: {email}")
+        return jsonify({'error': 'Invalid email or password'}), 401
+    
+    # Only check approval for members
+    if user.role == 'member' and not user.is_approved:
+        print(f"Member not approved: {email}")
+        return jsonify({'error': 'Account pending approval. Please wait for admin approval.'}), 403
+    
+    if user.role == 'member' and user.is_rejected:
+        print(f"Member rejected: {email}")
+        return jsonify({'error': 'Account has been rejected. Please contact administrator.'}), 403
+    
+    user.last_seen = datetime.utcnow().isoformat()
+    db.session.commit()
+    print(f"Login successful: {email}")
+    return jsonify(user.to_dict()), 200
     
 @app.route('/api/oauth-login', methods=['POST'])
 def oauth_login():
@@ -74,7 +104,14 @@ def oauth_login():
             password=generate_password_hash(random_pass),
             role='member',
             municipality='all',
-            last_seen=datetime.utcnow().isoformat()
+            last_seen=datetime.utcnow().isoformat(),
+            is_approved=False,
+            approved_by='',
+            approved_date='',
+            registration_date=datetime.utcnow().isoformat(),
+            is_rejected=False,
+            rejected_by='',
+            rejected_date=''
         )
         db.session.add(user)
         
@@ -88,6 +125,10 @@ def oauth_login():
         db.session.add(new_member)
         db.session.commit()
     else:
+        if user.role == 'member' and not user.is_approved:
+            return jsonify({'error': 'Account pending approval. Please wait for admin approval.'}), 403
+        if user.role == 'member' and user.is_rejected:
+            return jsonify({'error': 'Account has been rejected. Please contact administrator.'}), 403
         user.last_seen = datetime.utcnow().isoformat()
         db.session.commit()
         
@@ -107,31 +148,96 @@ def heartbeat():
         return jsonify({'status': 'success'}), 200
     return jsonify({'error': 'User not found'}), 404    
 
+
 @app.route('/api/register', methods=['POST'])
 def register():
-    from models import User
+    from models import User, Member
     
     data = request.json
     email = data.get('email')
+    name = data.get('name')
+    password = data.get('password')
+    role = data.get('role', 'member')
+    municipality = data.get('municipality')
     
-    if User.query.filter_by(email=email).first():
+    print(f"Registration attempt: {email}, Name: {name}, Role: {role}")
+    print(f"Password length received: {len(password) if password else 0}")
+    
+    # Check if user already exists
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        print(f"Email already exists: {email}")
         return jsonify({'error': 'Email already exists'}), 400
         
-    hashed_password = generate_password_hash(data.get('password'))
+    # Hash the password - ONLY ONCE
+    hashed_password = generate_password_hash(password)
+    print(f"Password hashed successfully for: {email}")
+    print(f"Hash length: {len(hashed_password)}")
+    print(f"Hash starts with scrypt: {hashed_password.startswith('scrypt:')}")
     
+    # Create user with the hashed password
     new_user = User(
-        name=data.get('name'),
+        name=name,
         email=email,
-        password=hashed_password,
-        role='member',
-        municipality=data.get('municipality'),
-        last_seen=''
+        password=hashed_password,  # Store the hashed password
+        role=role,
+        municipality=municipality,
+        last_seen='',
+        is_approved=False,
+        approved_by='',
+        approved_date='',
+        registration_date=datetime.utcnow().isoformat(),
+        is_rejected=False,
+        rejected_by='',
+        rejected_date=''
     )
     
     db.session.add(new_user)
+    db.session.flush()
+    
+    # Add to members table
+    new_member = Member(
+        name=name,
+        email=email,
+        role=role,
+        municipality=municipality,
+        joined=str(date.today())
+    )
+    db.session.add(new_member)
+    
+    try:
+        db.session.commit()
+        print(f"User registered successfully: {email}, ID: {new_user.id}")
+        return jsonify(new_user.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Registration error: {str(e)}")
+        return jsonify({'error': 'Registration failed. Please try again.'}), 500
+
+@app.route('/api/reset-password/<int:user_id>', methods=['POST'])
+def reset_password(user_id):
+    from models import User
+    from werkzeug.security import generate_password_hash
+    
+    data = request.json
+    new_password = data.get('password', 'member123')
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Re-hash the password
+    user.password = generate_password_hash(new_password)
     db.session.commit()
     
-    return jsonify(new_user.to_dict()), 201
+    return jsonify({
+        'success': True,
+        'email': user.email,
+        'message': 'Password reset successfully'
+    })
+
+
+
 
 def get_model(entity_name):
     from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast
@@ -163,8 +269,30 @@ def add_entity_item(entity):
     data = request.json
     
     if entity == 'users':
-        data['password'] = generate_password_hash(data.get('password'))
+        # Check if password is already hashed
+        # If the password is not already hashed, hash it
+        if 'password' in data and data['password']:
+            # Check if it's already hashed (starts with 'scrypt:' or 'pbkdf2:')
+            if not data['password'].startswith(('scrypt:', 'pbkdf2:')):
+                data['password'] = generate_password_hash(data['password'])
+        
         data['last_seen'] = ''
+        # Auto-approve admins when created by super admin
+        if data.get('role') in ['super_admin', 'municipal_officer', 'social_officer', 'department_officer']:
+            data['is_approved'] = True
+            data['approved_by'] = 'System Auto-Approval'
+            data['approved_date'] = datetime.utcnow().isoformat()
+        else:
+            data['is_approved'] = False
+            data['approved_by'] = ''
+            data['approved_date'] = ''
+        # Set rejected fields
+        data['is_rejected'] = False
+        data['rejected_by'] = ''
+        data['rejected_date'] = ''
+        if 'registration_date' not in data:
+            data['registration_date'] = datetime.utcnow().isoformat()
+    
     
     if entity == 'meetings':
         attendees = data.get('attendees', [])
@@ -261,8 +389,12 @@ def update_entity_item(entity, item_id):
 
     updated_data = request.json
 
+    # Only hash the password if it's a new password (not already hashed)
     if entity == 'users' and 'password' in updated_data and updated_data['password']:
-        updated_data['password'] = generate_password_hash(updated_data['password'])
+        # Check if the password is already hashed (starts with scrypt: or pbkdf2:)
+        password = updated_data['password']
+        if not password.startswith(('scrypt:', 'pbkdf2:', 'argon2')):
+            updated_data['password'] = generate_password_hash(password)
 
     if entity == 'meetings':
         if 'attendees' in updated_data:
@@ -372,6 +504,26 @@ def replace_entity_list(entity):
             item_data['password'] = generate_password_hash(item_data.get('password', 'default123'))
             if 'last_seen' not in item_data:
                 item_data['last_seen'] = ''
+            # Auto-approve admins
+            if item_data.get('role') in ['super_admin', 'municipal_officer', 'social_officer', 'department_officer']:
+                item_data['is_approved'] = True
+                if 'approved_by' not in item_data or not item_data['approved_by']:
+                    item_data['approved_by'] = 'System Auto-Approval'
+                if 'approved_date' not in item_data or not item_data['approved_date']:
+                    item_data['approved_date'] = datetime.utcnow().isoformat()
+            else:
+                item_data['is_approved'] = False
+                item_data['approved_by'] = ''
+                item_data['approved_date'] = ''
+            # Set rejected fields
+            if 'is_rejected' not in item_data:
+                item_data['is_rejected'] = False
+            if 'rejected_by' not in item_data:
+                item_data['rejected_by'] = ''
+            if 'rejected_date' not in item_data:
+                item_data['rejected_date'] = ''
+            if 'registration_date' not in item_data:
+                item_data['registration_date'] = datetime.utcnow().isoformat()
         if entity == 'meetings':
             attendees = item_data.get('attendees', [])
             if isinstance(attendees, list):

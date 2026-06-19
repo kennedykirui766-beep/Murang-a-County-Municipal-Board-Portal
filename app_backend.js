@@ -38,7 +38,7 @@ const DB = {
             const response = await fetch(`${API_BASE_URL}/${entity}`);
             if (!response.ok) return [];
             return await response.json();
-        } catch (error) { console.error(`Error fetching ${entity}:`, error); return []; }
+        } catch (error) { return []; }
     },
     async _replaceData(entity, data) {
         try {
@@ -47,8 +47,7 @@ const DB = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            if (!response.ok) console.error(`Error updating ${entity}`);
-        } catch (error) { console.error(`Error updating ${entity}:`, error); }
+        } catch (error) { }
     },
     async _addItem(entity, item) {
         try {
@@ -59,7 +58,7 @@ const DB = {
             });
             if (!response.ok) return null;
             return await response.json();
-        } catch (error) { console.error(`Error adding item:`, error); return null; }
+        } catch (error) { return null; }
     },
     async _deleteItem(entity, id) {
         try {
@@ -68,12 +67,10 @@ const DB = {
                 headers: { 'Content-Type': 'application/json' }
             });
             if (!response.ok) {
-                console.error(`Error deleting item from ${entity}:`, response.statusText);
                 return false;
             }
             return true;
         } catch (error) {
-            console.error(`Error deleting item:`, error);
             return false;
         }
     },
@@ -85,12 +82,10 @@ const DB = {
                 body: JSON.stringify(data)
             });
             if (!response.ok) {
-                console.error(`Error updating item from ${entity}:`, response.statusText);
                 return false;
             }
             return true;
         } catch (error) {
-            console.error(`Error updating item:`, error);
             return false;
         }
     },
@@ -111,21 +106,30 @@ const DB = {
             const response = await fetch(`${API_BASE_URL}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(user)
+                body: JSON.stringify({
+                    name: user.name,
+                    email: user.email,
+                    password: user.password,
+                    role: user.role || 'member',
+                    municipality: user.municipality || 'kenol'
+                })
             });
+            
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Registration failed');
+                let errorMessage = 'Registration failed';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (e) { }
+                throw new Error(errorMessage);
             }
             return await response.json();
         } catch (error) {
-            console.error('Registration error:', error);
             throw error;
         }
     },
-    
     getNextId(array) { return array.length ? Math.max(...array.map(item => item.id || 0)) + 1 : 1; }
-};
+}
 
 async function seedData() { }
 
@@ -184,14 +188,29 @@ async function login(email, password) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
+    
+    if (response.status === 403) {
+      const error = await response.json();
+      toast(error.error || 'Account pending approval. Please wait for admin approval.', 'warning');
+      return false;
+    }
+    
+    if (response.status === 401) {
+      const error = await response.json();
+      toast(error.error || 'Invalid email or password. Please check your credentials.', 'danger');
+      return false;
+    }
+    
     if (response.ok) {
       currentUser = await response.json();
       localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
       return true;
     }
+    
+    toast('Login failed. Please try again.', 'danger');
     return false;
   } catch (error) {
-    console.error('Login error:', error);
+    toast('An error occurred. Please check your connection.', 'danger');
     return false;
   }
 }
@@ -229,6 +248,13 @@ function showAppInfo() {
   
   const trackNav = byId('navTrack');
   if (trackNav) trackNav.style.display = isSystemAdmin(currentUser) ? 'flex' : 'none';
+  
+  const approvalsNav = byId('navApprovals');
+  if (approvalsNav) {
+    approvalsNav.style.display = (isSystemAdmin(currentUser) || currentUser.role === 'municipal_officer') ? 'flex' : 'none';
+  }
+  
+  updateApprovalsBadge();
 }
 
 function render(html) {
@@ -250,9 +276,363 @@ async function navigate(page) {
     case 'track': await renderTrackUsers(); break;
     case 'emails': await renderEmails(); break;
     case 'broadcasts': await renderBroadcasts(); break;
+    case 'approvals': await renderApprovals(); break;
     default: render('<div class="card"><h2>Page not found</h2></div>');
   }
 }
+
+// ============= APPROVALS MANAGEMENT =============
+
+async function updateApprovalsBadge() {
+  try {
+    const users = await DB.users();
+    let pendingUsers = users.filter(u => !u.is_approved && u.role === 'member' && !u.is_rejected);
+    
+    // If user is a municipal officer, only show pending users from their municipality
+    if (currentUser && currentUser.role === 'municipal_officer') {
+      pendingUsers = pendingUsers.filter(u => u.municipality === currentUser.municipality);
+    }
+    
+    const count = pendingUsers.length;
+    
+    const badge = document.getElementById('approvalsBadge');
+    if (badge) {
+      if (count > 0) {
+        badge.style.display = 'inline-flex';
+        badge.textContent = count > 99 ? '99+' : count;
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch (error) { }
+}
+
+async function renderApprovals() {
+  if (!isSystemAdmin(currentUser) && currentUser.role !== 'municipal_officer') {
+    render('<div class="card"><h2>Access Denied</h2><p>Only Super Admin and Municipal Officers can manage approvals.</p></div>');
+    return;
+  }
+
+  const users = await DB.users();
+  
+  const memberUsers = users.filter(u => u.role === 'member');
+  
+  // Filter based on user role
+  let filteredMemberUsers = memberUsers;
+  if (currentUser.role === 'municipal_officer') {
+    filteredMemberUsers = memberUsers.filter(u => u.municipality === currentUser.municipality);
+  }
+  
+  const pendingUsers = filteredMemberUsers.filter(u => !u.is_approved && !u.is_rejected);
+  const approvedUsers = filteredMemberUsers.filter(u => u.is_approved && !u.is_rejected);
+  const rejectedUsers = filteredMemberUsers.filter(u => u.is_rejected === true);
+  
+  const totalUsers = filteredMemberUsers.length;
+  const pendingCount = pendingUsers.length;
+  const approvedCount = approvedUsers.length;
+  const rejectedCount = rejectedUsers.length;
+
+  render(`
+    <div class="page-header">
+      <h2>
+        <i class="fas fa-user-check"></i> User Approvals
+        <span class="approvals-count badge badge-warning" style="margin-left:0.5rem;font-size:0.8rem;">${pendingCount}</span>
+        ${currentUser.role === 'municipal_officer' ? `<span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem;">(${getMunicipalityLabel(currentUser.municipality)} only)</span>` : ''}
+      </h2>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <span class="badge badge-warning">Pending: ${pendingCount}</span>
+        <span class="badge badge-success">Approved: ${approvedCount}</span>
+        <span class="badge badge-danger">Rejected: ${rejectedCount}</span>
+        <span class="badge badge-info">Total: ${totalUsers}</span>
+      </div>
+    </div>
+
+    <div class="approval-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-outline active" onclick="filterApprovals('pending', event)">
+        <i class="fas fa-clock"></i> Pending <span class="badge badge-warning" style="font-size:0.7rem;">${pendingCount}</span>
+      </button>
+      <button class="btn btn-sm btn-outline" onclick="filterApprovals('approved', event)">
+        <i class="fas fa-check-circle" style="color:var(--success);"></i> Approved <span class="badge badge-success" style="font-size:0.7rem;">${approvedCount}</span>
+      </button>
+      <button class="btn btn-sm btn-outline" onclick="filterApprovals('rejected', event)">
+        <i class="fas fa-times-circle" style="color:var(--danger);"></i> Rejected <span class="badge badge-danger" style="font-size:0.7rem;">${rejectedCount}</span>
+      </button>
+      <button class="btn btn-sm btn-outline" onclick="filterApprovals('all', event)">
+        <i class="fas fa-users"></i> All <span class="badge badge-info" style="font-size:0.7rem;">${totalUsers}</span>
+      </button>
+    </div>
+
+    <div id="approvalsList">
+      ${renderApprovalTable(pendingUsers, 'pending')}
+    </div>
+  `);
+
+  await updateApprovalsBadge();
+}
+
+function renderApprovalTable(users, type) {
+  if (!users || users.length === 0) {
+    const iconMap = {
+      pending: 'clock',
+      approved: 'check-circle',
+      rejected: 'times-circle',
+      all: 'users'
+    };
+    const colorMap = {
+      pending: 'var(--warning)',
+      approved: 'var(--success)',
+      rejected: 'var(--danger)',
+      all: 'var(--info)'
+    };
+    const labelMap = {
+      pending: 'Pending',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      all: 'Users'
+    };
+    return `
+      <div class="card text-center text-muted" style="padding:3rem;">
+        <i class="fas fa-${iconMap[type]}" 
+           style="font-size:3rem;color:${colorMap[type]};margin-bottom:1rem;"></i>
+        <h3>No ${labelMap[type]} Users</h3>
+        <p>${type === 'pending' ? 'All user accounts have been reviewed.' : 
+           type === 'approved' ? 'No users have been approved yet.' : 
+           type === 'rejected' ? 'No users have been rejected.' : 
+           'No users found.'}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Municipality</th>
+            <th>Registration Date</th>
+            ${type === 'approved' ? '<th>Approved By</th>' : type === 'rejected' ? '<th>Rejected By</th>' : '<th>Status</th>'}
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users.map((user, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td><strong>${user.name}</strong></td>
+              <td>${user.email}</td>
+              <td>${getMunicipalityLabel(user.municipality)}</td>
+              <td>${formatDate(user.registration_date)}</td>
+              <td>
+                ${type === 'approved' ? (user.approved_by || 'System') : 
+                  type === 'rejected' ? (user.rejected_by || 'System') : 
+                  '<span class="badge badge-warning">Pending</span>'}
+              </td>
+              <td style="white-space:nowrap;">
+                ${type === 'pending' ? `
+                  <button class="btn btn-success btn-sm" onclick="approveUser(${user.id})">
+                    <i class="fas fa-check"></i> Approve
+                  </button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectUser(${user.id})">
+                    <i class="fas fa-times"></i> Reject
+                  </button>
+                ` : type === 'approved' ? `
+                  <button class="btn btn-warning btn-sm" onclick="rejectUser(${user.id})">
+                    <i class="fas fa-times"></i> Reject
+                  </button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">
+                    <i class="fas fa-trash"></i> Delete
+                  </button>
+                ` : `
+                  <button class="btn btn-success btn-sm" onclick="approveUser(${user.id})">
+                    <i class="fas fa-check"></i> Approve
+                  </button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">
+                    <i class="fas fa-trash"></i> Delete
+                  </button>
+                `}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function filterApprovals(filter, event) {
+  if (event && event.target) {
+    document.querySelectorAll('.approval-tabs .btn').forEach(btn => btn.classList.remove('active'));
+    const target = event.target.closest('.btn');
+    if (target) target.classList.add('active');
+  }
+
+  const users = (async () => {
+    const allUsers = await DB.users();
+    let memberUsers = allUsers.filter(u => u.role === 'member');
+    
+    // Filter based on user role
+    if (currentUser && currentUser.role === 'municipal_officer') {
+      memberUsers = memberUsers.filter(u => u.municipality === currentUser.municipality);
+    }
+    
+    let filteredUsers = [];
+    switch(filter) {
+      case 'pending':
+        filteredUsers = memberUsers.filter(u => !u.is_approved && !u.is_rejected);
+        break;
+      case 'approved':
+        filteredUsers = memberUsers.filter(u => u.is_approved && !u.is_rejected);
+        break;
+      case 'rejected':
+        filteredUsers = memberUsers.filter(u => u.is_rejected === true);
+        break;
+      case 'all':
+      default:
+        filteredUsers = memberUsers;
+        break;
+    }
+    
+    const listContainer = document.getElementById('approvalsList');
+    if (listContainer) {
+      listContainer.innerHTML = renderApprovalTable(filteredUsers, filter);
+    }
+  })();
+}
+
+async function approveUser(userId) {
+  if (!confirm('Approve this user account?')) return;
+  
+  try {
+    const users = await DB.users();
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast('User not found', 'danger');
+      return;
+    }
+    
+    // Check if municipal officer is trying to approve a user from a different municipality
+    if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
+      toast('You can only approve users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
+      return;
+    }
+    
+    const updateData = {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      municipality: user.municipality,
+      is_approved: true,
+      approved_by: currentUser.name,
+      approved_date: new Date().toISOString(),
+      is_rejected: false,
+      last_seen: user.last_seen || '',
+      registration_date: user.registration_date || new Date().toISOString()
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    
+    if (response.ok) {
+      toast(`User ${user.name} approved successfully ✅`, 'success');
+      await updateApprovalsBadge();
+      await renderApprovals();
+    } else {
+      const error = await response.json();
+      toast('Failed to approve user: ' + (error.error || 'Unknown error'), 'danger');
+    }
+  } catch (error) {
+    toast('An error occurred', 'danger');
+  }
+}
+
+async function rejectUser(userId) {
+  if (!confirm('Reject this user account? They will not be able to login unless approved later.')) return;
+  
+  try {
+    const users = await DB.users();
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast('User not found', 'danger');
+      return;
+    }
+    
+    // Check if municipal officer is trying to reject a user from a different municipality
+    if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
+      toast('You can only reject users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
+      return;
+    }
+    
+    const updateData = {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      municipality: user.municipality,
+      is_approved: false,
+      is_rejected: true,
+      rejected_by: currentUser.name,
+      rejected_date: new Date().toISOString(),
+      last_seen: user.last_seen || '',
+      registration_date: user.registration_date || new Date().toISOString()
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    
+    if (response.ok) {
+      toast(`User ${user.name} rejected`, 'info');
+      await updateApprovalsBadge();
+      await renderApprovals();
+    } else {
+      const error = await response.json();
+      toast('Failed to reject user: ' + (error.error || 'Unknown error'), 'danger');
+    }
+  } catch (error) {
+    toast('An error occurred', 'danger');
+  }
+}
+
+async function deleteUser(userId) {
+  if (!confirm('Delete this user account permanently?')) return;
+  
+  try {
+    const users = await DB.users();
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast('User not found', 'danger');
+      return;
+    }
+    
+    // Check if municipal officer is trying to delete a user from a different municipality
+    if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
+      toast('You can only delete users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
+      return;
+    }
+    
+    const success = await DB._deleteItem('users', userId);
+    await DB._deleteItem('members', userId);
+    
+    if (success) {
+      toast(`User ${user.name} deleted permanently`, 'info');
+      await updateApprovalsBadge();
+      await renderApprovals();
+    } else {
+      toast('Failed to delete user', 'danger');
+    }
+  } catch (error) {
+    toast('An error occurred', 'danger');
+  }
+}
+
+// ============= REST OF THE CODE (Dashboard, Members, Meetings, Minutes, Complaints, Broadcasts, Documents, Users, Track Users, Emails, Shared Functions) =============
 
 async function renderDashboard() {
   const members = getAllowedItems(await DB.members());
@@ -376,6 +756,7 @@ async function showAddMemberModal() {
       <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Add Member</button>
     </form>
   `);
+  
   byId('addMemberForm').addEventListener('submit', async function (event) {
     event.preventDefault();
     const name = byId('mName').value.trim();
@@ -383,18 +764,39 @@ async function showAddMemberModal() {
     const password = byId('mPassword').value.trim();
     const role = byId('mRole').value;
     const municipality = byId('mMunicipality').value;
-    if (!name || !email || !password) { toast('Complete all fields', 'danger'); return; }
-    const users = await DB.users();
-    if (users.find(u => u.email === email)) { toast('Email already exists', 'danger'); return; }
     
-    const newUser = await DB.addUser({ name, email, password, role, municipality });
+    if (!name || !email || !password) { 
+      toast('Complete all fields', 'danger'); 
+      return; 
+    }
+    
+    const users = await DB.users();
+    if (users.find(u => u.email === email)) { 
+      toast('Email already exists', 'danger'); 
+      return; 
+    }
+    
+    const newUser = await DB.addUser({ 
+      name, 
+      email, 
+      password,
+      role, 
+      municipality 
+    });
+    
     if (!newUser) {
         toast('Failed to add user', 'danger');
         return;
     }
 
     if (role !== 'super_admin') {
-        const newMember = await DB.addMember({ name, email, role, municipality, joined: new Date().toISOString().slice(0, 10) });
+        const newMember = await DB.addMember({ 
+          name, 
+          email, 
+          role, 
+          municipality, 
+          joined: new Date().toISOString().slice(0, 10) 
+        });
         if (!newMember) {
             toast('Failed to add member', 'danger');
             return;
@@ -421,7 +823,6 @@ async function deleteMember(id) {
 
 // ============= UPDATED MEETING FUNCTIONS WITH FILE PREVIEW =============
 
-// File upload handlers for meetings
 function handleFileSelect(event) {
   const files = event.target.files;
   handleFiles(files);
@@ -531,7 +932,6 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-// Enhanced Schedule Meeting Modal
 async function showScheduleMeetingModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   uploadedMeetingFiles = [];
@@ -640,7 +1040,6 @@ async function showScheduleMeetingModal() {
   });
 }
 
-// Enhanced View Meeting Files with Preview
 async function viewMeetingFiles(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
@@ -1507,7 +1906,6 @@ async function confirmDeleteMeeting(id) {
 
 // ============= ENHANCED MINUTES FUNCTIONS =============
 
-// Minutes file upload handlers
 function handleMinutesFileSelect(event) {
   const files = event.target.files;
   handleMinutesFiles(files);
@@ -1602,16 +2000,13 @@ function removeMinutesFile(index) {
   displayMinutesFileList();
 }
 
-// Enhanced Show Upload Minutes Modal with Title, Summary, and File Upload
 async function showUploadMinutesModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   uploadedMinutesFiles = [];
   
-  // Get meetings for the dropdown
   const meetings = await DB.meetings();
   const allowedMeetings = getAllowedItems(meetings);
   
-  // Generate meeting ID options
   let meetingOptions = '<option value="">None (General Minutes)</option>';
   allowedMeetings.forEach(meeting => {
     meetingOptions += `<option value="${meeting.id}">${meeting.id} - ${meeting.title} (${formatDate(meeting.date)})</option>`;
@@ -1709,12 +2104,10 @@ async function showUploadMinutesModal() {
   });
 }
 
-// Enhanced renderMinutes with title, summary, and files
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
   const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
   
-  // Sort by upload date (newest first)
   minutes.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
   
   render(`
@@ -1777,7 +2170,6 @@ async function renderMinutes() {
   `);
 }
 
-// View minutes files
 async function viewMinutesFiles(id) {
   const minutes = await DB.minutes();
   const minute = minutes.find(item => item.id === id);
@@ -1849,7 +2241,6 @@ async function viewMinutesFiles(id) {
   `);
 }
 
-// Preview minutes file
 function previewMinutesFile(minuteId, fileIndex) {
   const minutes = (async () => { return await DB.minutes(); })();
   minutes.then(minutesList => {
@@ -1895,7 +2286,6 @@ function previewMinutesFile(minuteId, fileIndex) {
   });
 }
 
-// Download minutes file
 function downloadMinutesFile(minuteId, fileIndex) {
   const minutes = (async () => { return await DB.minutes(); })();
   minutes.then(minutesList => {
@@ -1915,7 +2305,6 @@ function downloadMinutesFile(minuteId, fileIndex) {
   });
 }
 
-// Delete minute
 async function deleteMinute(id) {
   if (!confirm('Delete these minutes?')) return;
   const success = await DB._deleteItem('minutes', id);
@@ -1929,12 +2318,10 @@ async function deleteMinute(id) {
 
 // ============= ENHANCED COMPLAINTS FUNCTIONS =============
 
-// Updated renderComplaints with new fields and assignment options
 async function renderComplaints() {
   const complaints = getAllowedItems(await DB.complaints());
   const users = await DB.users();
   
-  // Get all social officers and department officers for assignment
   const socialOfficers = users.filter(u => u.role === 'social_officer');
   const departmentOfficers = users.filter(u => u.role === 'department_officer');
   const allAssignable = [...socialOfficers, ...departmentOfficers];
@@ -1942,7 +2329,6 @@ async function renderComplaints() {
   const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
   const canSubmit = currentUser.role === 'member' || currentUser.role === 'department_officer' || currentUser.role === 'social_officer' || currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
   
-  // Group assignable officers by municipality
   const assignableByMuni = {};
   allAssignable.forEach(officer => {
     if (!assignableByMuni[officer.municipality]) {
@@ -1964,7 +2350,6 @@ async function renderComplaints() {
         resolved: 'badge-success'
       };
       
-      // Get officers for this complaint's municipality
       const muniOfficers = assignableByMuni[c.municipality] || [];
       const allMuniOfficers = assignableByMuni['all'] || [];
       const availableOfficers = [...muniOfficers, ...allMuniOfficers];
@@ -2008,7 +2393,6 @@ async function renderComplaints() {
   `);
 }
 
-// Enhanced Add Complaint Modal - now accessible to members
 async function showAddComplaintModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   
@@ -2067,14 +2451,12 @@ async function showAddComplaintModal() {
   });
 }
 
-// Enhanced Assign Complaint - now includes role
 async function assignComplaint(id) {
   const select = byId(`assignSelect_${id}`);
   if (!select) return;
   const assignee = select.value;
   if (!assignee) { toast('Please select an assignee', 'danger'); return; }
   
-  // Get the role from the selected option
   const selectedOption = select.options[select.selectedIndex];
   const role = selectedOption ? selectedOption.dataset.role : '';
   
@@ -2090,7 +2472,6 @@ async function assignComplaint(id) {
   }
 }
 
-// Update complaint status
 async function updateComplaintStatus(id, status) {
   const complaints = await DB.complaints();
   const complaint = complaints.find(item => item.id === id);
@@ -2101,7 +2482,6 @@ async function updateComplaintStatus(id, status) {
   navigate('complaints');
 }
 
-// Delete complaint
 async function deleteComplaint(id) {
   if (!confirm('Delete this complaint?')) return;
   const success = await DB._deleteItem('complaints', id);
@@ -2115,7 +2495,6 @@ async function deleteComplaint(id) {
 
 // ============= ENHANCED BROADCAST FUNCTIONS WITH FILE UPLOAD =============
 
-// Broadcast file upload handlers
 function handleBroadcastFileSelect(event) {
   const files = event.target.files;
   handleBroadcastFiles(files);
@@ -2210,7 +2589,6 @@ function removeBroadcastFile(index) {
   displayBroadcastFileList();
 }
 
-// Enhanced Show Broadcast Modal with File Upload
 async function showBroadcastModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   uploadedBroadcastFiles = [];
@@ -2280,7 +2658,6 @@ async function showBroadcastModal() {
   });
 }
 
-// Enhanced renderBroadcasts - removed Create Broadcast button from Admin Broadcast card
 async function renderBroadcasts() {
   const broadcasts = getAllowedItems(await DB.broadcasts());
   broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -2356,7 +2733,6 @@ async function renderBroadcasts() {
   `);
 }
 
-// View broadcast files
 async function viewBroadcastFiles(id) {
   const broadcasts = await DB.broadcasts();
   const broadcast = broadcasts.find(item => item.id === id);
@@ -2428,7 +2804,6 @@ async function viewBroadcastFiles(id) {
   `);
 }
 
-// Preview broadcast file
 function previewBroadcastFile(broadcastId, fileIndex) {
   const broadcasts = (async () => { return await DB.broadcasts(); })();
   broadcasts.then(broadcastsList => {
@@ -2474,7 +2849,6 @@ function previewBroadcastFile(broadcastId, fileIndex) {
   });
 }
 
-// Download broadcast file
 function downloadBroadcastFile(broadcastId, fileIndex) {
   const broadcasts = (async () => { return await DB.broadcasts(); })();
   broadcasts.then(broadcastsList => {
@@ -2494,7 +2868,6 @@ function downloadBroadcastFile(broadcastId, fileIndex) {
   });
 }
 
-// Delete broadcast
 async function deleteBroadcast(id) {
   if (!confirm('Delete this broadcast?')) return;
   const success = await DB._deleteItem('broadcasts', id);
@@ -2764,17 +3137,17 @@ function showEditUserModal(user) {
   });
 }
 
-async function deleteUser(id) {
+async function deleteUser(userId) {
   const users = await DB.users();
-  const target = users.find(user => user.id === id);
+  const target = users.find(user => user.id === userId);
   if (target && target.role === 'super_admin' && users.filter(user => user.role === 'super_admin').length <= 1) {
     toast('Cannot delete the last super admin', 'danger');
     return;
   }
   if (!confirm('Delete this user?')) return;
   
-  const userSuccess = await DB._deleteItem('users', id);
-  const memberSuccess = await DB._deleteItem('members', id);
+  const userSuccess = await DB._deleteItem('users', userId);
+  const memberSuccess = await DB._deleteItem('members', userId);
 
   if (userSuccess && memberSuccess) {
       toast('User deleted', 'success');
@@ -2799,7 +3172,6 @@ async function updateUser(id, userData) {
       toast('Failed to update user', 'danger');
     }
   } catch (error) {
-    console.error('Update error:', error);
     toast('An error occurred', 'danger');
   }
 }
@@ -3214,9 +3586,15 @@ async function boot() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: currentUser.id })
           });
-        } catch (e) { console.error('Heartbeat failed'); }
+        } catch (e) { }
       }
     }, 60000);
+    
+    setInterval(async () => {
+      if (currentUser && (isSystemAdmin(currentUser) || currentUser.role === 'municipal_officer')) {
+        await updateApprovalsBadge();
+      }
+    }, 30000);
 
     navigate('dashboard');
   }
@@ -3263,6 +3641,10 @@ function showCreateAccountModal() {
           <option value="muranga_town">Murang'a Town</option>
         </select>
       </div>
+      <div style="background:var(--surface-alt);padding:0.75rem;border-radius:8px;margin-bottom:1rem;border-left:3px solid var(--warning);">
+        <i class="fas fa-info-circle" style="color:var(--warning);"></i>
+        <span style="font-size:0.9rem;color:var(--text-muted);"> Your account will be pending approval after registration. You will receive access once approved by an administrator.</span>
+      </div>
       <button type="submit" class="btn btn-primary btn-block">
         <i class="fas fa-user-plus"></i> Create Account
       </button>
@@ -3306,9 +3688,10 @@ function showCreateAccountModal() {
     }
     
     try {
-      const newUser = await DB.registerUser({ name, email, password, role, municipality });
+      const userData = { name, email, password, role, municipality };
+      const newUser = await DB.registerUser(userData);
       closeModal();
-      toast('Account created successfully! You can now login.', 'success');
+      toast('Account created successfully! Your account is pending approval. You will be notified once approved.', 'success');
     } catch (error) {
       toast(error.message || 'Email already exists. Please use a different email.', 'danger');
     }
@@ -3400,8 +3783,6 @@ async function loginWithOAuth(providerName, providerId) {
 
 // ============= PROFILE SETTINGS FUNCTIONS =============
 
-// ============= PROFILE SETTINGS FUNCTIONS =============
-
 async function loadProfileSettings() {
   if (!currentUser) return;
   
@@ -3420,7 +3801,6 @@ async function loadProfileSettings() {
   if (muniBadge) muniBadge.textContent = currentUser.municipality === 'all' ? 'All Municipalities' : getMunicipalityLabel(currentUser.municipality);
 }
 
-// Handle profile form submission
 document.addEventListener('DOMContentLoaded', function() {
   const profileForm = document.getElementById('profileForm');
   if (profileForm) {
@@ -3432,13 +3812,11 @@ document.addEventListener('DOMContentLoaded', function() {
       const confirmPassword = document.getElementById('profileConfirmPassword').value;
       const messageEl = document.getElementById('profileMessage');
       
-      // Validate name
       if (!name) {
         showProfileMessage('Please enter your full name.', 'danger');
         return;
       }
       
-      // Validate passwords if provided
       if (password && password.length < 6) {
         showProfileMessage('Password must be at least 6 characters long.', 'danger');
         return;
@@ -3466,7 +3844,6 @@ document.addEventListener('DOMContentLoaded', function() {
           currentUser = updatedUser;
           localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
           
-          // Update display
           const nameEl = document.getElementById('settingsUserName');
           if (nameEl) nameEl.textContent = currentUser.name;
           
@@ -3475,11 +3852,9 @@ document.addEventListener('DOMContentLoaded', function() {
           
           showProfileMessage('Profile updated successfully!', 'success');
           
-          // Clear password fields
           document.getElementById('profilePassword').value = '';
           document.getElementById('profileConfirmPassword').value = '';
           
-          // Refresh after 2 seconds
           setTimeout(() => {
             window.location.reload();
           }, 2000);
@@ -3488,13 +3863,11 @@ document.addEventListener('DOMContentLoaded', function() {
           showProfileMessage(error.error || 'Failed to update profile.', 'danger');
         }
       } catch (error) {
-        console.error('Update error:', error);
         showProfileMessage('An error occurred. Please try again.', 'danger');
       }
     });
   }
   
-  // Load profile data if on settings page
   if (document.body.dataset.page === 'settings') {
     setTimeout(loadProfileSettings, 500);
   }
@@ -3508,7 +3881,6 @@ function showProfileMessage(message, type = 'info') {
   messageEl.className = `alert alert-${type}`;
   messageEl.style.display = 'block';
   
-  // Auto-hide after 5 seconds
   clearTimeout(messageEl._timeout);
   messageEl._timeout = setTimeout(() => {
     messageEl.style.display = 'none';
@@ -3562,6 +3934,11 @@ window.viewBroadcastFiles = viewBroadcastFiles;
 window.previewBroadcastFile = previewBroadcastFile;
 window.downloadBroadcastFile = downloadBroadcastFile;
 window.renderTrackUsers = renderTrackUsers;
+window.renderApprovals = renderApprovals;
+window.approveUser = approveUser;
+window.rejectUser = rejectUser;
+window.filterApprovals = filterApprovals;
+window.updateApprovalsBadge = updateApprovalsBadge;
 window.showCreateAccountModal = showCreateAccountModal;
 window.loginWithGoogle = loginWithGoogle;
 window.loginWithMicrosoft = loginWithMicrosoft;

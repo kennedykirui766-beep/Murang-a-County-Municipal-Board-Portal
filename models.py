@@ -16,7 +16,14 @@ class User(db.Model):
     password = db.Column(db.String(200))
     role = db.Column(db.String(50))
     municipality = db.Column(db.String(50))
-    last_seen = db.Column(db.String(50), default='')  # Tracks activity
+    last_seen = db.Column(db.String(50), default='')
+    is_approved = db.Column(db.Boolean, default=False)
+    approved_by = db.Column(db.String(100), default='')
+    approved_date = db.Column(db.String(50), default='')
+    registration_date = db.Column(db.String(50), default='')
+    is_rejected = db.Column(db.Boolean, default=False)  # NEW
+    rejected_by = db.Column(db.String(100), default='')  # NEW
+    rejected_date = db.Column(db.String(50), default='')  # NEW
     
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -29,7 +36,7 @@ class Member(db.Model):
     email = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    joined = db.Column(db.String, nullable=False)  # Stored as 'YYYY-MM-DD'
+    joined = db.Column(db.String, nullable=False)
 
     def to_dict(self):
         return {
@@ -172,7 +179,7 @@ class Broadcast(db.Model):
     sender = db.Column(db.String(100), nullable=False)
     timestamp = db.Column(db.String, nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
-    files = db.Column(db.Text, default='[]')  # NEW: Store file data as JSON
+    files = db.Column(db.Text, default='[]')
 
     def to_dict(self):
         d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
