@@ -21,9 +21,9 @@ class User(db.Model):
     approved_by = db.Column(db.String(100), default='')
     approved_date = db.Column(db.String(50), default='')
     registration_date = db.Column(db.String(50), default='')
-    is_rejected = db.Column(db.Boolean, default=False)  # NEW
-    rejected_by = db.Column(db.String(100), default='')  # NEW
-    rejected_date = db.Column(db.String(50), default='')  # NEW
+    is_rejected = db.Column(db.Boolean, default=False)
+    rejected_by = db.Column(db.String(100), default='')
+    rejected_date = db.Column(db.String(50), default='')
     
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -135,6 +135,9 @@ class Document(db.Model):
     municipality = db.Column(db.String(50), nullable=False)
     uploadDate = db.Column(db.String, nullable=False)
     fileName = db.Column(db.String(255), nullable=False)
+    fileData = db.Column(db.Text, nullable=True)  # Store base64 file data
+    fileSize = db.Column(db.Integer, nullable=True)  # Store file size in bytes
+    fileType = db.Column(db.String(100), nullable=True)  # Store MIME type
 
     def to_dict(self):
         return {
@@ -144,7 +147,10 @@ class Document(db.Model):
             'uploadedBy': self.uploadedBy,
             'municipality': self.municipality,
             'uploadDate': self.uploadDate,
-            'fileName': self.fileName
+            'fileName': self.fileName,
+            'fileData': self.fileData,
+            'fileSize': self.fileSize,
+            'fileType': self.fileType
         }
 
 

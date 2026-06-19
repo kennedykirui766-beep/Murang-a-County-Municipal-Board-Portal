@@ -138,6 +138,7 @@ let speechUtterance = null;
 let uploadedMeetingFiles = [];
 let uploadedMinutesFiles = [];
 let uploadedBroadcastFiles = [];
+let uploadedDocumentFiles = [];
 
 const qs = selector => document.querySelector(selector);
 const qsa = selector => document.querySelectorAll(selector);
@@ -288,7 +289,6 @@ async function updateApprovalsBadge() {
     const users = await DB.users();
     let pendingUsers = users.filter(u => !u.is_approved && u.role === 'member' && !u.is_rejected);
     
-    // If user is a municipal officer, only show pending users from their municipality
     if (currentUser && currentUser.role === 'municipal_officer') {
       pendingUsers = pendingUsers.filter(u => u.municipality === currentUser.municipality);
     }
@@ -317,7 +317,6 @@ async function renderApprovals() {
   
   const memberUsers = users.filter(u => u.role === 'member');
   
-  // Filter based on user role
   let filteredMemberUsers = memberUsers;
   if (currentUser.role === 'municipal_officer') {
     filteredMemberUsers = memberUsers.filter(u => u.municipality === currentUser.municipality);
@@ -473,7 +472,6 @@ function filterApprovals(filter, event) {
     const allUsers = await DB.users();
     let memberUsers = allUsers.filter(u => u.role === 'member');
     
-    // Filter based on user role
     if (currentUser && currentUser.role === 'municipal_officer') {
       memberUsers = memberUsers.filter(u => u.municipality === currentUser.municipality);
     }
@@ -513,7 +511,6 @@ async function approveUser(userId) {
       return;
     }
     
-    // Check if municipal officer is trying to approve a user from a different municipality
     if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
       toast('You can only approve users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
       return;
@@ -562,7 +559,6 @@ async function rejectUser(userId) {
       return;
     }
     
-    // Check if municipal officer is trying to reject a user from a different municipality
     if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
       toast('You can only reject users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
       return;
@@ -611,7 +607,6 @@ async function deleteUser(userId) {
       return;
     }
     
-    // Check if municipal officer is trying to delete a user from a different municipality
     if (currentUser.role === 'municipal_officer' && user.municipality !== currentUser.municipality) {
       toast('You can only delete users from your municipality (' + getMunicipalityLabel(currentUser.municipality) + ')', 'danger');
       return;
@@ -632,7 +627,7 @@ async function deleteUser(userId) {
   }
 }
 
-// ============= REST OF THE CODE (Dashboard, Members, Meetings, Minutes, Complaints, Broadcasts, Documents, Users, Track Users, Emails, Shared Functions) =============
+// ============= DASHBOARD =============
 
 async function renderDashboard() {
   const members = getAllowedItems(await DB.members());
@@ -709,6 +704,8 @@ async function renderDashboard() {
     </div>
   `);
 }
+
+// ============= MEMBERS =============
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
@@ -821,7 +818,7 @@ async function deleteMember(id) {
   }
 }
 
-// ============= UPDATED MEETING FUNCTIONS WITH FILE PREVIEW =============
+// ============= MEETINGS =============
 
 function handleFileSelect(event) {
   const files = event.target.files;
@@ -1403,7 +1400,7 @@ async function showDeclineModal(meetingId) {
   });
 }
 
-// ============= ENHANCED VIEW ATTENDANCE =============
+// ============= VIEW ATTENDANCE =============
 
 async function viewAttendance(id) {
   const meetings = await DB.meetings();
@@ -1904,7 +1901,7 @@ async function confirmDeleteMeeting(id) {
   }
 }
 
-// ============= ENHANCED MINUTES FUNCTIONS =============
+// ============= MINUTES =============
 
 function handleMinutesFileSelect(event) {
   const files = event.target.files;
@@ -2316,7 +2313,7 @@ async function deleteMinute(id) {
   }
 }
 
-// ============= ENHANCED COMPLAINTS FUNCTIONS =============
+// ============= COMPLAINTS =============
 
 async function renderComplaints() {
   const complaints = getAllowedItems(await DB.complaints());
@@ -2493,7 +2490,7 @@ async function deleteComplaint(id) {
   }
 }
 
-// ============= ENHANCED BROADCAST FUNCTIONS WITH FILE UPLOAD =============
+// ============= BROADCASTS =============
 
 function handleBroadcastFileSelect(event) {
   const files = event.target.files;
@@ -2879,62 +2876,208 @@ async function deleteBroadcast(id) {
   }
 }
 
-// ============= REST OF THE CODE (Documents, Users, Track Users, Emails, Shared Functions) =============
+// ============= DOCUMENTS (ENHANCED WITH VIEW, DOWNLOAD, DELETE) =============
 
-async function renderDocuments() {
-  const documents = getAllowedItems(await DB.documents());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
-  render(`
-    <div class="page-header">
-      <h2><i class="fas fa-folder-open"></i> Documents</h2>
-      ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showUploadDocModal()"><i class="fas fa-upload"></i> Upload Document</button>' : ''}
-    </div>
-    <div class="card table-wrap">
-      <table>
-        <thead><tr><th>Name</th><th>Type</th><th>Uploaded By</th><th>Municipality</th><th>Date</th><th>Action</th></tr></thead>
-        <tbody>
-          ${documents.length ? documents.map(doc => `
-            <tr>
-              <td>${doc.name}</td>
-              <td>${doc.type}</td>
-              <td>${doc.uploadedBy}</td>
-              <td>${getMunicipalityLabel(doc.municipality)}</td>
-              <td>${formatDate(doc.uploadDate)}</td>
-              <td style="white-space:nowrap;">
-                <button class="btn btn-success btn-sm" onclick="downloadDoc(${doc.id})"><i class="fas fa-download"></i></button>
-                ${canAdd ? `<button class="btn btn-danger btn-sm" onclick="deleteDoc(${doc.id})"><i class="fas fa-trash"></i></button>` : ''}
-              </td>
-            </tr>
-          `).join('') : '<tr><td colspan="6" class="text-center text-muted">No documents uploaded yet.</td></tr>'}
-        </tbody>
-      </table>
-    </div>
-  `);
+// Document file upload handlers
+function handleDocumentFileSelect(event) {
+  const files = event.target.files;
+  handleDocumentFiles(files);
 }
 
+function handleDocumentFileDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const files = event.dataTransfer.files;
+  handleDocumentFiles(files);
+  const dropZone = document.getElementById('documentUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleDocumentDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('documentUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--primary)';
+    dropZone.style.background = 'var(--surface-alt)';
+  }
+}
+
+function handleDocumentDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('documentUploadDropZone');
+  if (dropZone) {
+    dropZone.style.borderColor = 'var(--border)';
+    dropZone.style.background = 'var(--surface)';
+  }
+}
+
+function handleDocumentFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > 10 * 1024 * 1024) {
+      toast(`File "${file.name}" is too large. Maximum size is 10MB.`, 'danger');
+      continue;
+    }
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      toast(`File "${file.name}" is not a supported format.`, 'warning');
+      continue;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: e.target.result,
+        uploadDate: new Date().toISOString()
+      };
+      uploadedDocumentFiles.push(fileData);
+      displayDocumentFileList();
+    };
+    reader.readAsDataURL(file);
+  }
+  const fileInput = document.getElementById('documentFileInput');
+  if (fileInput) fileInput.value = '';
+}
+
+function displayDocumentFileList() {
+  const fileList = document.getElementById('documentFileList');
+  if (!fileList) return;
+  
+  if (uploadedDocumentFiles.length === 0) {
+    fileList.innerHTML = '';
+    return;
+  }
+  
+  fileList.innerHTML = uploadedDocumentFiles.map((file, index) => {
+    const isImage = file.type && file.type.startsWith('image/');
+    return `
+    <div style="display:flex; align-items:center; gap:0.5rem; background:var(--surface-alt); padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border);">
+      ${isImage ? `<img src="${file.data}" style="width:24px; height:24px; object-fit:cover; border-radius:4px;" />` : `<i class="${getFileIcon(file.type)}" style="color:var(--primary);"></i>`}
+      <span style="font-size:0.85rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</span>
+      <span style="font-size:0.7rem; color:var(--text-muted);">${formatFileSize(file.size)}</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="removeDocumentFile(${index})" style="padding:0.1rem 0.4rem; font-size:0.7rem;">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `}).join('');
+}
+
+function removeDocumentFile(index) {
+  uploadedDocumentFiles.splice(index, 1);
+  displayDocumentFileList();
+}
+
+// Show Upload Document Modal with File Upload
 async function showUploadDocModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
+  uploadedDocumentFiles = [];
+  
   showModal(`
     <h3><i class="fas fa-upload"></i> Upload Document</h3>
-    <form id="uploadDocForm">
-      <div class="form-group"><label>Document Name</label><input type="text" id="docName" required /></div>
-      <div class="form-group"><label>Type</label><select id="docType"><option value="PDF">PDF</option><option value="Image">Image</option><option value="Word">Word</option><option value="Excel">Excel</option><option value="Other">Other</option></select></div>
-      <div class="form-group"><label>Municipality</label><select id="docMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select></div>
-      <div class="form-group"><label>File Name</label><input type="text" id="docFileName" required placeholder="Example: Annual Report 2026.pdf" /></div>
-      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-upload"></i> Upload</button>
+    <form id="uploadDocForm" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Document Name <span style="color:var(--danger);">*</span></label>
+        <input type="text" id="docName" required placeholder="Enter document name (e.g., Annual Report 2026)" />
+      </div>
+      
+      <div class="form-group">
+        <label>Document Type</label>
+        <select id="docType">
+          <option value="PDF">PDF</option>
+          <option value="Word">Word</option>
+          <option value="Excel">Excel</option>
+          <option value="PowerPoint">PowerPoint</option>
+          <option value="Image">Image</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>Municipality <span style="color:var(--danger);">*</span></label>
+        <select id="docMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
+      </div>
+      
+      <div class="form-group">
+        <label>Upload File <span style="color:var(--danger);">*</span></label>
+        <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
+             id="documentUploadDropZone" 
+             ondrop="handleDocumentFileDrop(event)" 
+             ondragover="handleDocumentDragOver(event)"
+             ondragleave="handleDocumentDragLeave(event)"
+             onclick="document.getElementById('documentFileInput').click()">
+          <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
+          <p style="margin:0.5rem 0; color:var(--text-muted);">
+            Drag & drop your document here or click to browse
+          </p>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Supports: PDF, Word (.doc, .docx), Excel (.xls, .xlsx), PowerPoint (.ppt, .pptx), Images (JPG, PNG, GIF)
+          </p>
+          <p style="font-size:0.7rem; color:var(--danger);">
+            Max file size: 10MB
+          </p>
+          <input type="file" id="documentFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleDocumentFileSelect(event)" />
+        </div>
+        <div id="documentFileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-upload"></i> Upload Document</button>
     </form>
   `);
+  
+  document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
   byId('uploadDocForm').addEventListener('submit', async function (event) {
     event.preventDefault();
     const name = byId('docName').value.trim();
     const type = byId('docType').value;
     const municipality = byId('docMunicipality').value;
-    const fileName = byId('docFileName').value.trim();
-    if (!name || !fileName) { toast('Complete all fields', 'danger'); return; }
-    const newDoc = await DB.addDocument({ name, type, municipality, uploadedBy: currentUser.name, uploadDate: new Date().toISOString().slice(0, 10), fileName });
+    
+    if (!name) { 
+      toast('Please enter a document name', 'danger'); 
+      return; 
+    }
+    
+    if (uploadedDocumentFiles.length === 0) {
+      toast('Please upload a file', 'danger');
+      return;
+    }
+    
+    const file = uploadedDocumentFiles[0];
+    
+    const docData = { 
+      name: name,
+      type: type,
+      municipality: municipality,
+      uploadedBy: currentUser.name,
+      uploadDate: new Date().toISOString().slice(0, 10),
+      fileName: file.name,
+      fileData: file.data,
+      fileSize: file.size,
+      fileType: file.type
+    };
+    
+    const newDoc = await DB.addDocument(docData);
     if (newDoc) {
         closeModal();
-        toast('Document uploaded', 'success');
+        toast('Document uploaded successfully: ' + file.name + ' ✅', 'success');
         navigate('documents');
     } else {
         toast('Failed to upload document', 'danger');
@@ -2942,28 +3085,279 @@ async function showUploadDocModal() {
   });
 }
 
+// View Document - Show preview in modal
+async function viewDocument(id) {
+  const documents = await DB.documents();
+  const doc = documents.find(item => item.id === id);
+  if (!doc) {
+    toast('Document not found', 'danger');
+    return;
+  }
+  
+  const isImage = doc.fileType && doc.fileType.startsWith('image/');
+  const fileExtension = doc.fileName ? doc.fileName.split('.').pop().toLowerCase() : '';
+  const iconMap = {
+    'pdf': 'fas fa-file-pdf',
+    'doc': 'fas fa-file-word',
+    'docx': 'fas fa-file-word',
+    'xls': 'fas fa-file-excel',
+    'xlsx': 'fas fa-file-excel',
+    'ppt': 'fas fa-file-powerpoint',
+    'pptx': 'fas fa-file-powerpoint',
+    'jpg': 'fas fa-file-image',
+    'jpeg': 'fas fa-file-image',
+    'png': 'fas fa-file-image',
+    'gif': 'fas fa-file-image'
+  };
+  const icon = iconMap[fileExtension] || 'fas fa-file';
+  
+  showModal(`
+    <div style="text-align:center;">
+      <h3 style="margin-bottom:0.5rem;"><i class="fas fa-file"></i> ${doc.name}</h3>
+      <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+        ${doc.fileName} • ${doc.type} • ${doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}
+      </div>
+      <div style="margin-bottom:1rem; padding:0.5rem; background:var(--surface-alt); border-radius:8px; font-size:0.9rem; color:var(--text-muted);">
+        <span><i class="fas fa-user"></i> Uploaded by: ${doc.uploadedBy}</span>
+        <span style="margin-left:1rem;"><i class="fas fa-map-marker-alt"></i> ${getMunicipalityLabel(doc.municipality)}</span>
+        <span style="margin-left:1rem;"><i class="fas fa-calendar-day"></i> ${formatDate(doc.uploadDate)}</span>
+      </div>
+      ${isImage && doc.fileData ? `
+        <div style="background:var(--surface-alt); padding:1rem; border-radius:12px; border:1px solid var(--border);">
+          <img src="${doc.fileData}" style="max-width:100%; max-height:70vh; border-radius:8px;" />
+        </div>
+      ` : `
+        <div style="padding:3rem; background:var(--surface-alt); border-radius:12px; border:1px solid var(--border);">
+          <i class="${icon}" style="font-size:5rem; color:var(--primary);"></i>
+          <p style="margin-top:1rem; color:var(--text-muted); font-size:1.1rem;">
+            <strong>${doc.fileName}</strong>
+          </p>
+          <p style="color:var(--text-muted);">
+            File type: ${doc.type} • Size: ${doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown'}
+          </p>
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-top:0.5rem;">
+            Click the download button below to view this file.
+          </p>
+        </div>
+      `}
+      <div style="display:flex; gap:0.75rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="closeModal(); downloadDocument(${doc.id});">
+          <i class="fas fa-download"></i> Download
+        </button>
+        <button class="btn btn-outline" onclick="closeModal();">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+// Download Document
+function downloadDocument(id) {
+  const doc = (async () => { return (await DB.documents()).find(item => item.id === id); })();
+  doc.then(d => {
+    if (!d) {
+      toast('Document not found', 'danger');
+      return;
+    }
+    
+    if (d.fileData) {
+      const link = document.createElement('a');
+      link.href = d.fileData;
+      link.download = d.fileName || d.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast(`Downloading: ${d.fileName || d.name}`, 'success');
+    } else {
+      toast('File data not available for download', 'warning');
+    }
+  });
+}
+
+// Confirm Delete Document with styled popup
+async function confirmDeleteDocument(id) {
+  const documents = await DB.documents();
+  const doc = documents.find(item => item.id === id);
+  if (!doc) {
+    toast('Document not found', 'danger');
+    return;
+  }
+  
+  const isImage = doc.fileType && doc.fileType.startsWith('image/');
+  const fileExtension = doc.fileName ? doc.fileName.split('.').pop().toLowerCase() : '';
+  const iconMap = {
+    'pdf': 'fas fa-file-pdf',
+    'doc': 'fas fa-file-word',
+    'docx': 'fas fa-file-word',
+    'xls': 'fas fa-file-excel',
+    'xlsx': 'fas fa-file-excel',
+    'ppt': 'fas fa-file-powerpoint',
+    'pptx': 'fas fa-file-powerpoint',
+    'jpg': 'fas fa-file-image',
+    'jpeg': 'fas fa-file-image',
+    'png': 'fas fa-file-image',
+    'gif': 'fas fa-file-image'
+  };
+  const icon = iconMap[fileExtension] || 'fas fa-file';
+  
+  showModal(`
+    <div style="text-align:center; padding:0.5rem;">
+      <div style="font-size:4rem; margin-bottom:0.5rem; color:var(--danger);">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <h3 style="color:var(--danger); margin-bottom:0.5rem;">Delete Document</h3>
+      <p style="color:var(--text-muted); margin-bottom:1rem;">
+        Are you sure you want to delete this document? This action cannot be undone.
+      </p>
+      
+      <div style="background:var(--surface-alt); padding:1.25rem; border-radius:12px; margin:1rem 0; border:1px solid var(--border); text-align:left;">
+        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.75rem;">
+          ${isImage && doc.fileData ? 
+            `<img src="${doc.fileData}" style="width:50px; height:50px; object-fit:cover; border-radius:8px; border:1px solid var(--border);" />` :
+            `<i class="${icon}" style="font-size:2.5rem; color:var(--primary);"></i>`
+          }
+          <div>
+            <div style="font-weight:600; font-size:1.05rem;">${doc.name}</div>
+            <div style="font-size:0.85rem; color:var(--text-muted);">${doc.fileName || 'Unknown file'} • ${doc.type}</div>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem; color:var(--text-muted);">
+          <div><i class="fas fa-user"></i> Uploaded by: ${doc.uploadedBy}</div>
+          <div><i class="fas fa-map-marker-alt"></i> ${getMunicipalityLabel(doc.municipality)}</div>
+          <div><i class="fas fa-calendar-day"></i> ${formatDate(doc.uploadDate)}</div>
+          <div><i class="fas fa-file"></i> ${doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'}</div>
+        </div>
+      </div>
+      
+      <div style="display:flex; gap:0.75rem; justify-content:center; margin-top:1.25rem; flex-wrap:wrap;">
+        <button class="btn btn-danger" onclick="closeModal(); deleteDocument(${doc.id});" style="min-width:120px;">
+          <i class="fas fa-trash"></i> Yes, Delete
+        </button>
+        <button class="btn btn-outline" onclick="closeModal();" style="min-width:100px;">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+// Delete Document
+async function deleteDocument(id) {
+  const success = await DB._deleteItem('documents', id);
+  if (success) {
+    toast('Document deleted successfully 🗑️', 'success');
+    navigate('documents');
+  } else {
+    toast('Failed to delete document', 'danger');
+  }
+}
+
+// Render Documents with View, Download, and Delete buttons
+async function renderDocuments() {
+  const documents = getAllowedItems(await DB.documents());
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const isAdmin = canAdd;
+  
+  documents.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+  
+  render(`
+    <div class="page-header">
+      <h2><i class="fas fa-folder-open"></i> Documents</h2>
+      ${canAdd ? '<button class="btn btn-primary btn-sm" onclick="showUploadDocModal()"><i class="fas fa-upload"></i> Upload Document</button>' : ''}
+    </div>
+    
+    ${documents.length ? `
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem;">
+        ${documents.map(doc => {
+          const fileExtension = doc.fileName ? doc.fileName.split('.').pop().toLowerCase() : '';
+          const iconMap = {
+            'pdf': 'fas fa-file-pdf',
+            'doc': 'fas fa-file-word',
+            'docx': 'fas fa-file-word',
+            'xls': 'fas fa-file-excel',
+            'xlsx': 'fas fa-file-excel',
+            'ppt': 'fas fa-file-powerpoint',
+            'pptx': 'fas fa-file-powerpoint',
+            'jpg': 'fas fa-file-image',
+            'jpeg': 'fas fa-file-image',
+            'png': 'fas fa-file-image',
+            'gif': 'fas fa-file-image'
+          };
+          const colorMap = {
+            'pdf': '#e74c3c',
+            'doc': '#2980b9',
+            'docx': '#2980b9',
+            'xls': '#27ae60',
+            'xlsx': '#27ae60',
+            'ppt': '#e67e22',
+            'pptx': '#e67e22',
+            'jpg': '#8e44ad',
+            'jpeg': '#8e44ad',
+            'png': '#8e44ad',
+            'gif': '#8e44ad'
+          };
+          const icon = iconMap[fileExtension] || 'fas fa-file';
+          const color = colorMap[fileExtension] || 'var(--primary)';
+          const isImage = doc.fileType && doc.fileType.startsWith('image/');
+          
+          return `
+            <div class="card" style="padding:1rem; border-left:4px solid ${color};">
+              <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+                ${isImage && doc.fileData ? 
+                  `<img src="${doc.fileData}" style="width:40px; height:40px; object-fit:cover; border-radius:4px; border:1px solid var(--border);" />` :
+                  `<i class="${icon}" style="font-size:2rem; color:${color};"></i>`
+                }
+                <div style="flex:1; min-width:0;">
+                  <div style="font-weight:600; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${doc.name}">
+                    ${doc.name}
+                  </div>
+                  <div style="font-size:0.75rem; color:var(--text-muted);">
+                    ${doc.type} • ${doc.fileName || 'Unknown file'}
+                    ${doc.fileSize ? ` • ${formatFileSize(doc.fileSize)}` : ''}
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem; font-size:0.85rem; color:var(--text-muted);">
+                <span><i class="fas fa-user"></i> ${doc.uploadedBy}</span>
+                <span><i class="fas fa-map-marker-alt"></i> ${getMunicipalityLabel(doc.municipality)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                <span style="font-size:0.8rem; color:var(--text-muted);">
+                  <i class="fas fa-calendar-day"></i> ${formatDate(doc.uploadDate)}
+                </span>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  <button class="btn btn-info btn-sm" onclick="viewDocument(${doc.id})" title="View">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn btn-success btn-sm" onclick="downloadDocument(${doc.id})" title="Download">
+                    <i class="fas fa-download"></i>
+                  </button>
+                  ${isAdmin ? `
+                    <button class="btn btn-danger btn-sm" onclick="confirmDeleteDocument(${doc.id})" title="Delete">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : '<div class="card text-center text-muted">No documents uploaded yet.</div>'}
+  `);
+}
+
+// Keep legacy functions for backward compatibility
 function downloadDoc(id) {
-    const doc = (async () => { return (await DB.documents()).find(item => item.id === id); })();
-    doc.then(d => {
-        if (!d) return;
-        const link = document.createElement('a');
-        link.href = '#';
-        link.download = d.fileName || d.name;
-        link.click();
-        toast(`Download started: ${d.fileName || d.name}`, 'success');
-    });
+  downloadDocument(id);
 }
 
 async function deleteDoc(id) {
-  if (!confirm('Delete this document?')) return;
-  const success = await DB._deleteItem('documents', id);
-  if (success) {
-      toast('Document deleted', 'success');
-      navigate('documents');
-  } else {
-      toast('Failed to delete document', 'danger');
-  }
+  await confirmDeleteDocument(id);
 }
+
+// ============= USERS (ENHANCED WITH ROLE SWITCHING) =============
 
 async function renderUsers() {
   if (!isSystemAdmin(currentUser)) {
@@ -2987,7 +3381,16 @@ async function renderUsers() {
               <td>${getRoleLabel(user.role)}</td>
               <td>${getMunicipalityLabel(user.municipality)}</td>
               <td style="white-space:nowrap;">
-                <button class="btn btn-warning btn-sm" onclick="editUser(${user.id})"><i class="fas fa-edit"></i></button>
+                ${user.role === 'member' ? `
+                  <button class="btn btn-warning btn-sm" onclick="switchUserRole(${user.id}, 'municipal_officer')" title="Promote to Municipal Officer">
+                    <i class="fas fa-user-shield"></i> Promote
+                  </button>
+                ` : user.role === 'municipal_officer' ? `
+                  <button class="btn btn-secondary btn-sm" onclick="switchUserRole(${user.id}, 'member')" title="Demote to Member">
+                    <i class="fas fa-user"></i> Demote
+                  </button>
+                ` : ''}
+                <button class="btn btn-info btn-sm" onclick="editUser(${user.id})"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})"><i class="fas fa-trash"></i></button>
               </td>
             </tr>
@@ -2996,6 +3399,73 @@ async function renderUsers() {
       </table>
     </div>
   `);
+}
+
+// Switch User Role - Only Super Admin can do this
+async function switchUserRole(userId, newRole) {
+  if (!isSystemAdmin(currentUser)) {
+    toast('Only Super Admin can switch user roles', 'danger');
+    return;
+  }
+  
+  try {
+    const users = await DB.users();
+    const user = users.find(u => u.id === userId);
+    if (!user) {
+      toast('User not found', 'danger');
+      return;
+    }
+    
+    // Don't allow switching Super Admin role
+    if (user.role === 'super_admin') {
+      toast('Cannot change Super Admin role', 'danger');
+      return;
+    }
+    
+    const roleLabel = getRoleLabel(newRole);
+    const currentRoleLabel = getRoleLabel(user.role);
+    
+    // Confirm with user
+    if (!confirm(`Are you sure you want to change ${user.name}'s role from ${currentRoleLabel} to ${roleLabel}?`)) {
+      return;
+    }
+    
+    // If promoting to municipal_officer, make sure they have a municipality
+    let municipality = user.municipality;
+    if (newRole === 'municipal_officer' && municipality === 'all') {
+      municipality = 'kenol'; // Default to Kenol if none specified
+    }
+    
+    const updateData = {
+      name: user.name,
+      email: user.email,
+      role: newRole,
+      municipality: municipality,
+      is_approved: true, // Auto-approve when promoted
+      approved_by: currentUser.name,
+      approved_date: new Date().toISOString(),
+      is_rejected: false,
+      last_seen: user.last_seen || '',
+      registration_date: user.registration_date || new Date().toISOString()
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData)
+    });
+    
+    if (response.ok) {
+      toast(`User ${user.name} role changed from ${currentRoleLabel} to ${roleLabel} successfully ✅`, 'success');
+      // Refresh the users list
+      await renderUsers();
+    } else {
+      const error = await response.json();
+      toast('Failed to change user role: ' + (error.error || 'Unknown error'), 'danger');
+    }
+  } catch (error) {
+    toast('An error occurred while changing user role', 'danger');
+  }
 }
 
 async function renderTrackUsers() {
@@ -3176,7 +3646,8 @@ async function updateUser(id, userData) {
   }
 }
 
-// ============= EMAIL MODULE =============
+// ============= EMAILS =============
+
 async function renderEmails() {
   const emails = getAllowedItems(await DB.emails());
   emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -3388,6 +3859,7 @@ async function filterEmails(filter, event) {
 }
 
 // ============= SHARED FUNCTIONS =============
+
 function showModal(content) {
   let overlay = byId('modalOverlay');
   if (!overlay) {
@@ -3914,6 +4386,7 @@ window.downloadDoc = downloadDoc;
 window.deleteDoc = deleteDoc;
 window.showAddUserModal = showAddUserModal;
 window.deleteUser = deleteUser;
+window.switchUserRole = switchUserRole;
 window.toggleTheme = toggleTheme;
 window.stopSpeech = stopSpeech;
 window.speakText = speakText;
@@ -3963,5 +4436,14 @@ window.handleBroadcastFileDrop = handleBroadcastFileDrop;
 window.handleBroadcastDragOver = handleBroadcastDragOver;
 window.handleBroadcastDragLeave = handleBroadcastDragLeave;
 window.removeBroadcastFile = removeBroadcastFile;
+window.handleDocumentFileSelect = handleDocumentFileSelect;
+window.handleDocumentFileDrop = handleDocumentFileDrop;
+window.handleDocumentDragOver = handleDocumentDragOver;
+window.handleDocumentDragLeave = handleDocumentDragLeave;
+window.removeDocumentFile = removeDocumentFile;
+window.viewDocument = viewDocument;
+window.downloadDocument = downloadDocument;
+window.confirmDeleteDocument = confirmDeleteDocument;
+window.deleteDocument = deleteDocument;
 
 window.addEventListener('DOMContentLoaded', boot);

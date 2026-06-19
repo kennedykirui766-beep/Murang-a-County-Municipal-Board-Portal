@@ -191,7 +191,7 @@ def seed_database():
             role='member', 
             municipality='kenol',
             last_seen='',
-            is_approved=False,  # Needs approval
+            is_approved=False,
             approved_by='',
             approved_date='',
             registration_date=now,
@@ -208,7 +208,7 @@ def seed_database():
             role='member', 
             municipality='kangare',
             last_seen='',
-            is_approved=True,  # Already approved
+            is_approved=True,
             approved_by='Super Developer',
             approved_date=now,
             registration_date=now,
@@ -366,7 +366,7 @@ def seed_database():
         ]
         db.session.add_all(emails_data)
 
-        # --- Broadcasts with files field ---
+        # --- Broadcasts ---
         broadcasts_data = [
             Broadcast(
                 message='Welcome to the Murang\'a County Municipal Board Portal! Please familiarize yourself with the system.',
@@ -385,26 +385,7 @@ def seed_database():
         ]
         db.session.add_all(broadcasts_data)
 
-        # --- Documents ---
-        documents_data = [
-            Document(
-                name='Annual Report 2025',
-                type='PDF',
-                uploadedBy='Super Developer',
-                municipality='all',
-                uploadDate=today,
-                fileName='Annual_Report_2025.pdf'
-            ),
-            Document(
-                name='Kenol Budget 2026',
-                type='Excel',
-                uploadedBy='Kenol Municipal Officer',
-                municipality='kenol',
-                uploadDate=today,
-                fileName='Kenol_Budget_2026.xlsx'
-            )
-        ]
-        db.session.add_all(documents_data)
+        # --- NO MOCK DOCUMENTS - They will be added by users ---
 
         db.session.commit()
         print("Database seeded successfully!")
