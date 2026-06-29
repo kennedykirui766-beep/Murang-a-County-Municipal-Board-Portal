@@ -1,13 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Murang'a County Municipal Board Portal</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body data-page="login">
+  <!-- Accessibility Bar -->
   <div class="accessibility-bar" id="accessibilityBar">
     <span class="label"><i class="fas fa-universal-access"></i> Accessibility</span>
     <button id="aTextSmall" title="Small text"><i class="fas fa-font"></i> A-</button>
@@ -26,42 +28,428 @@
     <button id="speechStop" style="background:none;border:none;color:white;cursor:pointer;font-size:1.2rem;">✕</button>
   </div>
 
+  <!-- Login Page -->
   <div id="loginPage">
-    <div class="login-card">
-      <div class="login-logo-container">
-        <img src="logo.png" alt="Murang'a County Logo" class="login-logo" />
-        <h1>Murang'a County</h1>
-        <p class="subtitle">Municipal Board Portal</p>
+    <div class="login-wrapper">
+      <!-- Decorative Background Elements -->
+      <div class="bg-decoration">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
       </div>
-      <form id="loginForm">
-        <div class="form-group">
-          <label for="loginEmail"><i class="fas fa-envelope"></i> Email</label>
-          <input type="email" id="loginEmail" placeholder="Enter your email" required value="admin@muranga.go.ke" />
+
+      <div class="login-card">
+        <!-- Left Column: Brand & Illustration -->
+        <div class="login-brand-section">
+          <div class="brand-content">
+            <!-- Animated Logo -->
+            <div class="brand-icon-wrapper">
+              <div class="logo-ring"></div>
+              <img src="logo.png" alt="Murang'a County Logo" class="login-logo" />
+            </div>
+            
+            <h1>Murang'a County</h1>
+            <p class="brand-tagline">Municipal Board Portal</p>
+            
+            <!-- Feature Cards -->
+            <div class="brand-features">
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <i class="fas fa-building" aria-hidden="true"></i>
+                </div>
+                <div class="feature-text">
+                  <span class="feature-title">Streamlined Services</span>
+                  <span class="feature-desc">Efficient municipal management</span>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <i class="fas fa-clock" aria-hidden="true"></i>
+                </div>
+                <div class="feature-text">
+                  <span class="feature-title">Real-time Updates</span>
+                  <span class="feature-desc">Stay informed with the latest news and announcements</span>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-icon">
+                  <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                </div>
+                <div class="feature-text">
+                  <span class="feature-title">Secure Platform</span>
+                  <span class="feature-desc">Transparent governance</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="loginPassword"><i class="fas fa-lock"></i> Password</label>
-          <input type="password" id="loginPassword" placeholder="Enter your password" required value="admin123" />
+
+        <!-- Right Column: Login Form -->
+        <div class="login-form-section">
+          <div class="form-header">
+            <div class="welcome-badge">
+              <i class="fas fa-hand-peace" aria-hidden="true"></i>
+              Welcome Back
+            </div>
+            <h2>Sign in to your account</h2>
+            <p class="form-subtitle">Access the municipal board dashboard</p>
+          </div>
+
+          <form id="loginForm" novalidate>
+            <div class="form-group">
+              <label for="loginEmail">
+                <i class="fas fa-envelope" aria-hidden="true"></i>
+                Email Address
+              </label>
+              <div class="input-wrapper">
+                <input 
+                  type="email" 
+                  id="loginEmail" 
+                  placeholder="Enter your email" 
+                  autocomplete="email"
+                  required 
+                  value="admin@muranga.go.ke"
+                />
+                <span class="input-icon"><i class="fas fa-envelope"></i></span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="loginPassword">
+                <i class="fas fa-lock" aria-hidden="true"></i>
+                Password
+              </label>
+              <div class="password-input-group">
+                <input 
+                  type="password" 
+                  id="loginPassword" 
+                  placeholder="Enter your password" 
+                  autocomplete="current-password"
+                  required 
+                  value="admin123"
+                />
+                <span class="input-icon"><i class="fas fa-lock"></i></span>
+                <button 
+                  type="button" 
+                  id="passwordToggle" 
+                  class="password-toggle-btn"
+                  aria-label="Show password"
+                  aria-pressed="false"
+                  tabindex="0"
+                >
+                  <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="form-options">
+                <label class="remember-me">
+                  <input type="checkbox" checked />
+                  <span>Remember me</span>
+                </label>
+                <a href="#" class="forgot-link">Forgot password?</a>
+              </div>
+            </div>
+
+            <div id="loginError" class="alert alert-danger" style="display:none;" role="alert" aria-live="polite">
+              <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+              Invalid credentials. Please try again.
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">
+              <span>Sign In</span>
+              <i class="fas fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          </form>
+
+          <div class="form-footer">
+            <div class="divider">
+              <span>or</span>
+            </div>
+            <p class="footer-text">New to the portal?</p>
+            <button class="btn btn-outline btn-block" onclick="showCreateAccountModal()">
+              <i class="fas fa-user-plus" aria-hidden="true"></i>
+              Create Account
+            </button>
+          </div>
         </div>
-        <div id="loginError" class="alert alert-danger" style="display:none;">Invalid credentials. Please try again.</div>
-        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Login</button>
-      </form>
-      
-      <!-- Create Account Button -->
-      <div style="margin-top: 1rem; text-align: center;">
-        <hr style="border: none; border-top: 1px solid var(--border); margin-bottom: 1rem;" />
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem;">Don't have an account?</p>
-        <button class="btn btn-outline btn-block" onclick="showCreateAccountModal()">
-          <i class="fas fa-user-plus"></i> Create Account
-        </button>
       </div>
+
+      <!-- Footer with Accessibility Summary -->
+      <footer class="login-footer">
+        <div class="footer-content">
+          <div class="footer-brand">
+            <img src="logo.png" alt="Murang'a County Logo" class="footer-logo" />
+            <div>
+              <h3>Murang'a County</h3>
+              <p>Municipal Board Portal</p>
+            </div>
+          </div>
+          
+          <div class="footer-accessibility">
+            <h4><i class="fas fa-universal-access" aria-hidden="true"></i> Accessibility Features</h4>
+            <div class="accessibility-grid">
+              <div class="accessibility-item">
+                <i class="fas fa-font" aria-hidden="true"></i>
+                <div>
+                  <strong>Text Size</strong>
+                  <span>Adjust text from small to extra large (A-, A, A+, A++)</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-arrows-alt-v" aria-hidden="true"></i>
+                <div>
+                  <strong>Line Spacing</strong>
+                  <span>Toggle between compact and relaxed spacing for better readability</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-microphone" aria-hidden="true"></i>
+                <div>
+                  <strong>Text-to-Speech</strong>
+                  <span>Listen to page content with screen reader support</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-moon" aria-hidden="true"></i>
+                <div>
+                  <strong>Dark/Light Theme</strong>
+                  <span>Switch between light and dark modes for comfortable viewing</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                <div>
+                  <strong>Reset Settings</strong>
+                  <span>Restore all accessibility settings to their default state</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-keyboard" aria-hidden="true"></i>
+                <div>
+                  <strong>Keyboard Navigation</strong>
+                  <span>Full keyboard support with visible focus indicators</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-contrast" aria-hidden="true"></i>
+                <div>
+                  <strong>High Contrast</strong>
+                  <span>WCAG AA compliant contrast ratios for all text</span>
+                </div>
+              </div>
+              <div class="accessibility-item">
+                <i class="fas fa-universal-access" aria-hidden="true"></i>
+                <div>
+                  <strong>ARIA Support</strong>
+                  <span>Screen reader friendly with proper ARIA labels and roles</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer-bottom">
+            <p>&copy; 2026 Murang'a County Municipal Board. All rights reserved.</p>
+            <div class="footer-links">
+              <a href="#">Privacy Policy</a>
+              <a href="#">Terms of Service</a>
+              <a href="#">Contact Us</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   </div>
 
   <!-- Create Account Modal -->
   <div class="modal-overlay" id="createAccountModal">
-    <div class="modal-box">
+    <div class="modal-box modal-create-account">
       <button class="close-modal" onclick="closeCreateAccountModal()">&times;</button>
-      <div id="createAccountBody"></div>
+      <div id="createAccountBody">
+        <div class="modal-header">
+          <div class="modal-icon">
+            <i class="fas fa-user-plus"></i>
+          </div>
+          <h2>Create Account</h2>
+          <p class="modal-subtitle">Register for access to the Municipal Board Portal</p>
+        </div>
+
+        <form id="createAccountForm" novalidate>
+          <!-- Full Name -->
+          <div class="form-group">
+            <label for="createFullName">
+              <i class="fas fa-user" aria-hidden="true"></i>
+              Full Name
+            </label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="createFullName" 
+                placeholder="Enter your full name" 
+                required
+              />
+              <span class="input-icon"><i class="fas fa-user"></i></span>
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="form-group">
+            <label for="createEmail">
+              <i class="fas fa-envelope" aria-hidden="true"></i>
+              Email
+            </label>
+            <div class="input-wrapper">
+              <input 
+                type="email" 
+                id="createEmail" 
+                placeholder="Enter your email" 
+                autocomplete="email"
+                required
+              />
+              <span class="input-icon"><i class="fas fa-envelope"></i></span>
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label for="createPassword">
+              <i class="fas fa-lock" aria-hidden="true"></i>
+              Password
+            </label>
+            <div class="password-input-group">
+              <input 
+                type="password" 
+                id="createPassword" 
+                placeholder="Create a password" 
+                required
+                minlength="8"
+              />
+              <span class="input-icon"><i class="fas fa-lock"></i></span>
+              <button 
+                type="button" 
+                id="createPasswordToggle" 
+                class="password-toggle-btn"
+                aria-label="Show password"
+                aria-pressed="false"
+                tabindex="0"
+              >
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <div class="password-strength" id="passwordStrength">
+              <span class="strength-bar"></span>
+              <span class="strength-bar"></span>
+              <span class="strength-bar"></span>
+              <span class="strength-bar"></span>
+              <span class="strength-text">Password strength: <span id="strengthLabel">Enter a password</span></span>
+            </div>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group">
+            <label for="createConfirmPassword">
+              <i class="fas fa-check-circle" aria-hidden="true"></i>
+              Confirm Password
+            </label>
+            <div class="password-input-group">
+              <input 
+                type="password" 
+                id="createConfirmPassword" 
+                placeholder="Confirm your password" 
+                required
+              />
+              <span class="input-icon"><i class="fas fa-check-circle"></i></span>
+              <button 
+                type="button" 
+                id="createConfirmToggle" 
+                class="password-toggle-btn"
+                aria-label="Show password"
+                aria-pressed="false"
+                tabindex="0"
+              >
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <div class="password-match" id="passwordMatch">
+              <span class="match-text"><i class="fas fa-circle"></i> Passwords do not match</span>
+            </div>
+          </div>
+
+          <!-- Role -->
+          <div class="form-group">
+            <label for="createRole">
+              <i class="fas fa-user-tag" aria-hidden="true"></i>
+              Role
+            </label>
+            <div class="input-wrapper">
+              <select id="createRole" required>
+                <option value="">Select a role</option>
+                <option value="Member">Member</option>
+                <option value="Admin">Admin</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Clerk">Clerk</option>
+              </select>
+              <span class="input-icon"><i class="fas fa-chevron-down"></i></span>
+            </div>
+          </div>
+
+          <!-- Municipality -->
+          <div class="form-group">
+            <label for="createMunicipality">
+              <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+              Municipality
+            </label>
+            <div class="input-wrapper">
+              <select id="createMunicipality" required>
+                <option value="">Select a municipality</option>
+                <option value="Kenol">Kenol</option>
+                <option value="Murang'a Town">Murang'a Town</option>
+                <option value="Makuyu">Makuyu</option>
+                <option value="Kangema">Kangema</option>
+                <option value="Kiriaini">Kiriaini</option>
+              </select>
+              <span class="input-icon"><i class="fas fa-chevron-down"></i></span>
+            </div>
+          </div>
+
+          <div id="createAccountError" class="alert alert-danger" style="display:none;" role="alert" aria-live="polite">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span id="createAccountErrorMessage">Please fill in all fields correctly.</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">
+            <i class="fas fa-user-plus" aria-hidden="true"></i>
+            Create Account
+          </button>
+
+          <div class="form-footer">
+            <p class="footer-text">Already have an account?</p>
+            <button type="button" class="btn btn-outline btn-block" onclick="closeCreateAccountModal()">
+              <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+              Back to Login
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -74,5 +462,6 @@
   </div>
 
   <script src="app_backend.js"></script>
+  <script src="toggle-password.js"></script>
 </body>
 </html>
