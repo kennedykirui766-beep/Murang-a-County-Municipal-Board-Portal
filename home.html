@@ -18,6 +18,7 @@
     <button id="aSpacingRelaxed" title="Relaxed spacing"><i class="fas fa-expand-arrows-alt"></i> ↕</button>
     <button id="aSpeech" title="Text to Speech"><i class="fas fa-microphone"></i> Speak</button>
     <button id="aThemeToggle" title="Toggle dark/light mode"><i class="fas fa-moon"></i> Theme</button>
+    <button id="aContrastToggle" title="Toggle high contrast mode"><i class="fas fa-circle"></i> Contrast</button>
     <button id="aReset" title="Reset accessibility"><i class="fas fa-undo"></i> Reset</button>
   </div>
 
@@ -87,7 +88,97 @@
 
   <!-- Script to automatically update the year -->
   <script>
-    document.getElementById('currentYear').textContent = new Date().getFullYear();
+// Contrast toggle function - works independently for light and dark themes
+function toggleContrast() {
+  const html = document.documentElement;
+  const currentContrast = html.getAttribute('data-contrast');
+  const currentTheme = html.getAttribute('data-theme') || 'light';
+  
+  // Toggle contrast on/off
+  const nextContrast = currentContrast === 'high' ? 'normal' : 'high';
+  
+  if (nextContrast === 'high') {
+    html.setAttribute('data-contrast', 'high');
+    localStorage.setItem('mbp_contrast', 'high');
+  } else {
+    html.removeAttribute('data-contrast');
+    localStorage.removeItem('mbp_contrast');
+  }
+  
+  // Update button appearance
+  const btn = document.getElementById('aContrastToggle');
+  if (btn) {
+    if (nextContrast === 'high') {
+      btn.classList.add('active');
+      btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
+      if (currentTheme === 'light') {
+        btn.style.background = 'rgba(0, 0, 0, 0.15)';
+        btn.style.border = '2px solid #000000';
+        btn.style.color = '#000000';
+        btn.querySelector('i').style.color = '#000000';
+      } else {
+        btn.style.background = 'rgba(255, 255, 255, 0.25)';
+        btn.style.border = '2px solid #ffffff';
+        btn.style.color = '#ffffff';
+      }
+    } else {
+      btn.classList.remove('active');
+      btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
+      btn.style.background = '';
+      btn.style.border = '';
+      btn.style.color = '';
+    }
+  }
+  
+  toast(nextContrast === 'high' ? 'High contrast mode enabled' : 'Normal contrast restored', 'info');
+}
+
+// Restore contrast setting on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const savedContrast = localStorage.getItem('mbp_contrast');
+  const btn = document.getElementById('aContrastToggle');
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  
+  if (savedContrast === 'high') {
+    document.documentElement.setAttribute('data-contrast', 'high');
+    if (btn) {
+      btn.classList.add('active');
+      btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
+      if (currentTheme === 'light') {
+        btn.style.background = 'rgba(0, 0, 0, 0.15)';
+        btn.style.border = '2px solid #000000';
+        btn.style.color = '#000000';
+        btn.querySelector('i').style.color = '#000000';
+      } else {
+        btn.style.background = 'rgba(255, 255, 255, 0.25)';
+        btn.style.border = '2px solid #ffffff';
+        btn.style.color = '#ffffff';
+      }
+    }
+  }
+  
+  // Bind contrast toggle
+  if (btn) {
+    btn.addEventListener('click', toggleContrast);
+  }
+});
+
+// Override reset to clear contrast
+const originalReset = window.resetAccessibility;
+window.resetAccessibility = function() {
+  if (originalReset) originalReset();
+  document.documentElement.removeAttribute('data-contrast');
+  localStorage.removeItem('mbp_contrast');
+  const btn = document.getElementById('aContrastToggle');
+  if (btn) {
+    btn.classList.remove('active');
+    btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
+    btn.style.background = '';
+    btn.style.border = '';
+    btn.style.color = '';
+  }
+  toast('All accessibility settings reset', 'info');
+};
   </script>
 
   <script src="app_backend.js"></script>

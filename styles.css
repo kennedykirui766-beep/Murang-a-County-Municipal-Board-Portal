@@ -15,6 +15,15 @@
   --radius: 16px;
   --radius-sm: 10px;
   --transition: 0.2s ease;
+  /* Button colors - more vibrant */
+  --btn-success: #0d7a3a;
+  --btn-success-hover: #0a5e2d;
+  --btn-warning: #d48c00;
+  --btn-warning-hover: #b87a00;
+  --btn-danger: #b91c1c;
+  --btn-danger-hover: #991515;
+  --btn-info: #1a56b8;
+  --btn-info-hover: #14448f;
 }
 
 [data-theme="dark"] {
@@ -25,6 +34,901 @@
   --text-muted: #9ca3af;
   --border: #374151;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --btn-success: #22c55e;
+  --btn-success-hover: #16a34a;
+  --btn-warning: #f59e0b;
+  --btn-warning-hover: #d97706;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #dc2626;
+  --btn-info: #3b82f6;
+  --btn-info-hover: #2563eb;
+}
+
+/* ============================================================
+   HIGH CONTRAST - LIGHT THEME
+   ============================================================ */
+[data-theme="light"][data-contrast="high"] {
+  --surface: #ffffff;
+  --surface-alt: #f0f0f0;
+  --surface-muted: #e8e8e8;
+  --text: #000000;
+  --text-muted: #1a1a1a;
+  --border: #333333;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  --primary: #1a5e1a;
+  --primary-light: #2e7d32;
+  --primary-dark: #0d3d0d;
+  --btn-success: #0a5e2d;
+  --btn-success-hover: #084a23;
+  --btn-warning: #b87a00;
+  --btn-warning-hover: #9e6800;
+  --btn-danger: #991515;
+  --btn-danger-hover: #7a1010;
+  --btn-info: #14448f;
+  --btn-info-hover: #0f3672;
+}
+
+[data-theme="light"][data-contrast="high"] .login-brand-section {
+  background: #0d3d0d;
+}
+
+[data-theme="light"][data-contrast="high"] .accessibility-bar {
+  background: #0d3d0d;
+  border-bottom: 2px solid #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .card,
+[data-theme="light"][data-contrast="high"] .modal-box,
+[data-theme="light"][data-contrast="high"] .login-card,
+[data-theme="light"][data-contrast="high"] .login-footer {
+  border: 2px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .form-group input,
+[data-theme="light"][data-contrast="high"] .form-group select,
+[data-theme="light"][data-contrast="high"] .form-group textarea {
+  background: #ffffff;
+  color: #000000;
+  border: 2px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .form-group input:focus,
+[data-theme="light"][data-contrast="high"] .form-group select:focus,
+[data-theme="light"][data-contrast="high"] .form-group textarea:focus {
+  border-color: #1a5e1a;
+  box-shadow: 0 0 0 4px rgba(26, 94, 26, 0.3);
+}
+
+[data-theme="light"][data-contrast="high"] .stat-card {
+  border-left: 5px solid #1a5e1a;
+}
+
+[data-theme="light"][data-contrast="high"] .badge-success {
+  background: #0a5e2d;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .badge-danger {
+  background: #991515;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .badge-warning {
+  background: #b87a00;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .badge-info {
+  background: #14448f;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .alert-danger {
+  background: #fce4e4;
+  color: #991515;
+  border-left: 4px solid #991515;
+}
+
+[data-theme="light"][data-contrast="high"] .alert-success {
+  background: #e4fce4;
+  color: #0a5e2d;
+  border-left: 4px solid #0a5e2d;
+}
+
+[data-theme="light"][data-contrast="high"] .alert-info {
+  background: #e4ecfc;
+  color: #14448f;
+  border-left: 4px solid #14448f;
+}
+
+[data-theme="light"][data-contrast="high"] .alert-warning {
+  background: #fcf0e4;
+  color: #b87a00;
+  border-left: 4px solid #b87a00;
+}
+
+[data-theme="light"][data-contrast="high"] .sidebar .nav-item.active {
+  background: #1a5e1a;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .sidebar .nav-item:hover {
+  background: #e8e8e8;
+  border: 1px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .navbar {
+  border-bottom: 2px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .close-modal:hover {
+  background: #333333;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"][data-contrast="high"] .feature-item {
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"][data-contrast="high"] .feature-item:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"][data-contrast="high"] .accessibility-item {
+  background: #ffffff;
+  border: 1px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .accessibility-item:hover {
+  background: #f0f0f0;
+}
+
+[data-theme="light"][data-contrast="high"] .password-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"][data-contrast="high"] .btn-primary {
+  background: #1a5e1a;
+  color: #ffffff;
+  border: 2px solid #000000;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-primary:hover {
+  background: #0d3d0d;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-outline {
+  border: 2px solid #1a5e1a;
+  color: #1a5e1a;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-outline:hover {
+  background: #1a5e1a;
+  color: #ffffff;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-success,
+[data-theme="light"][data-contrast="high"] .meeting-btn-attend {
+  background: #0a5e2d;
+  color: #ffffff;
+  border: 2px solid #000000;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-success:hover,
+[data-theme="light"][data-contrast="high"] .meeting-btn-attend:hover {
+  background: #084a23;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-warning,
+[data-theme="light"][data-contrast="high"] .meeting-btn-decline {
+  background: #b87a00;
+  color: #ffffff;
+  border: 2px solid #000000;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-warning:hover,
+[data-theme="light"][data-contrast="high"] .meeting-btn-decline:hover {
+  background: #9e6800;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-danger,
+[data-theme="light"][data-contrast="high"] .meeting-btn-delete {
+  background: #991515;
+  color: #ffffff;
+  border: 2px solid #000000;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-danger:hover,
+[data-theme="light"][data-contrast="high"] .meeting-btn-delete:hover {
+  background: #7a1010;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-info,
+[data-theme="light"][data-contrast="high"] .meeting-btn-view {
+  background: #14448f;
+  color: #ffffff;
+  border: 2px solid #000000;
+}
+
+[data-theme="light"][data-contrast="high"] .btn-info:hover,
+[data-theme="light"][data-contrast="high"] .meeting-btn-view:hover {
+  background: #0f3672;
+}
+
+[data-theme="light"][data-contrast="high"] .complaint-item {
+  border: 2px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .strength-bar.active.weak {
+  background: #991515;
+}
+
+[data-theme="light"][data-contrast="high"] .strength-bar.active.medium {
+  background: #b87a00;
+}
+
+[data-theme="light"][data-contrast="high"] .strength-bar.active.strong {
+  background: #0a5e2d;
+}
+
+[data-theme="light"][data-contrast="high"] .strength-bar.active.very-strong {
+  background: #14448f;
+}
+
+[data-theme="light"][data-contrast="high"] .match-text.match {
+  color: #0a5e2d;
+}
+
+[data-theme="light"][data-contrast="high"] .match-text.no-match {
+  color: #991515;
+}
+
+[data-theme="light"][data-contrast="high"] .email-item {
+  border: 2px solid #333333;
+}
+
+[data-theme="light"][data-contrast="high"] .broadcast-item {
+  border-left: 4px solid #1a5e1a;
+}
+
+/* ============================================================
+   HIGH CONTRAST - DARK THEME
+   ============================================================ */
+[data-theme="dark"][data-contrast="high"] {
+  --surface: #0a0a0a;
+  --surface-alt: #1a1a1a;
+  --surface-muted: #050505;
+  --text: #ffffff;
+  --text-muted: #dddddd;
+  --border: #888888;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
+  --primary: #4caf50;
+  --primary-light: #66bb6a;
+  --primary-dark: #388e3c;
+  --btn-success: #4ade80;
+  --btn-success-hover: #22c55e;
+  --btn-warning: #fbbf24;
+  --btn-warning-hover: #f59e0b;
+  --btn-danger: #f87171;
+  --btn-danger-hover: #ef4444;
+  --btn-info: #60a5fa;
+  --btn-info-hover: #3b82f6;
+}
+
+[data-theme="dark"][data-contrast="high"] .login-brand-section {
+  background: #0a0a0a;
+}
+
+[data-theme="dark"][data-contrast="high"] .accessibility-bar {
+  background: #000000;
+  border-bottom: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .card,
+[data-theme="dark"][data-contrast="high"] .modal-box,
+[data-theme="dark"][data-contrast="high"] .login-card,
+[data-theme="dark"][data-contrast="high"] .login-footer {
+  border: 2px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .form-group input,
+[data-theme="dark"][data-contrast="high"] .form-group select,
+[data-theme="dark"][data-contrast="high"] .form-group textarea {
+  background: #0a0a0a;
+  color: #ffffff;
+  border: 2px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .form-group input:focus,
+[data-theme="dark"][data-contrast="high"] .form-group select:focus,
+[data-theme="dark"][data-contrast="high"] .form-group textarea:focus {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.4);
+}
+
+[data-theme="dark"][data-contrast="high"] .stat-card {
+  border-left: 5px solid #4caf50;
+}
+
+[data-theme="dark"][data-contrast="high"] .badge-success {
+  background: #22c55e;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .badge-danger {
+  background: #ef4444;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .badge-warning {
+  background: #f59e0b;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .badge-info {
+  background: #3b82f6;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .alert-danger {
+  background: #330000;
+  color: #f87171;
+  border-left: 4px solid #ef4444;
+}
+
+[data-theme="dark"][data-contrast="high"] .alert-success {
+  background: #003300;
+  color: #4ade80;
+  border-left: 4px solid #22c55e;
+}
+
+[data-theme="dark"][data-contrast="high"] .alert-info {
+  background: #001133;
+  color: #60a5fa;
+  border-left: 4px solid #3b82f6;
+}
+
+[data-theme="dark"][data-contrast="high"] .alert-warning {
+  background: #332200;
+  color: #fbbf24;
+  border-left: 4px solid #f59e0b;
+}
+
+[data-theme="dark"][data-contrast="high"] .sidebar .nav-item.active {
+  background: #4caf50;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .sidebar .nav-item:hover {
+  background: #1a1a1a;
+  border: 1px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .navbar {
+  border-bottom: 2px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .close-modal:hover {
+  background: #888888;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.95);
+}
+
+[data-theme="dark"][data-contrast="high"] .feature-item {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"][data-contrast="high"] .feature-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"][data-contrast="high"] .accessibility-item {
+  background: #0a0a0a;
+  border: 1px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .accessibility-item:hover {
+  background: #1a1a1a;
+}
+
+[data-theme="dark"][data-contrast="high"] .password-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-primary {
+  background: #4caf50;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-primary:hover {
+  background: #66bb6a;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-outline {
+  border: 2px solid #ffffff;
+  color: #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-outline:hover {
+  background: #ffffff;
+  color: #000000;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-success,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-attend {
+  background: #4ade80;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-success:hover,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-attend:hover {
+  background: #22c55e;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-warning,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-decline {
+  background: #fbbf24;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-warning:hover,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-decline:hover {
+  background: #f59e0b;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-danger,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-delete {
+  background: #f87171;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-danger:hover,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-delete:hover {
+  background: #ef4444;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-info,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-view {
+  background: #60a5fa;
+  color: #000000;
+  border: 2px solid #ffffff;
+}
+
+[data-theme="dark"][data-contrast="high"] .btn-info:hover,
+[data-theme="dark"][data-contrast="high"] .meeting-btn-view:hover {
+  background: #3b82f6;
+}
+
+[data-theme="dark"][data-contrast="high"] .complaint-item {
+  border: 2px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .strength-bar.active.weak {
+  background: #ef4444;
+}
+
+[data-theme="dark"][data-contrast="high"] .strength-bar.active.medium {
+  background: #f59e0b;
+}
+
+[data-theme="dark"][data-contrast="high"] .strength-bar.active.strong {
+  background: #22c55e;
+}
+
+[data-theme="dark"][data-contrast="high"] .strength-bar.active.very-strong {
+  background: #3b82f6;
+}
+
+[data-theme="dark"][data-contrast="high"] .match-text.match {
+  color: #4ade80;
+}
+
+[data-theme="dark"][data-contrast="high"] .match-text.no-match {
+  color: #f87171;
+}
+
+[data-theme="dark"][data-contrast="high"] .email-item {
+  border: 2px solid #888888;
+}
+
+[data-theme="dark"][data-contrast="high"] .broadcast-item {
+  border-left: 4px solid #4caf50;
+}
+
+/* ============================================================
+   MEETINGS SECTION - ENHANCED VISIBILITY
+   ============================================================ */
+
+/* Meeting cards - darker text */
+.card .flex-between strong,
+.card strong {
+  color: var(--text) !important;
+  font-weight: 700 !important;
+}
+
+/* Meeting description */
+.card p,
+.card .description {
+  color: var(--text) !important;
+}
+
+/* Meeting metadata (date, time, location) */
+.card .meta,
+.card .text-muted,
+.card [style*="color:var(--text-muted)"] {
+  color: var(--text) !important;
+  opacity: 0.85;
+}
+
+/* Meeting title in cards */
+.card .meeting-title {
+  color: var(--text) !important;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* ============================================================
+   MEETING BUTTONS - MORE VIBRANT
+   ============================================================ */
+
+/* Attend button - Dark Green */
+.btn-success,
+.complaint-item .actions .btn-success,
+.meeting-btn-attend {
+  background: var(--btn-success) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 10px rgba(13, 122, 58, 0.35);
+}
+
+.btn-success:hover,
+.complaint-item .actions .btn-success:hover,
+.meeting-btn-attend:hover {
+  background: var(--btn-success-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(13, 122, 58, 0.5);
+}
+
+.btn-success:active,
+.complaint-item .actions .btn-success:active,
+.meeting-btn-attend:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 8px rgba(13, 122, 58, 0.3);
+}
+
+/* Decline button - Vibrant Yellow/Orange */
+.btn-warning,
+.complaint-item .actions .btn-warning,
+.meeting-btn-decline {
+  background: var(--btn-warning) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 10px rgba(212, 140, 0, 0.35);
+}
+
+.btn-warning:hover,
+.complaint-item .actions .btn-warning:hover,
+.meeting-btn-decline:hover {
+  background: var(--btn-warning-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(212, 140, 0, 0.5);
+}
+
+.btn-warning:active,
+.complaint-item .actions .btn-warning:active,
+.meeting-btn-decline:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 8px rgba(212, 140, 0, 0.3);
+}
+
+/* View Attendance button - Vibrant Blue */
+.btn-info,
+.meeting-btn-view {
+  background: var(--btn-info) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 10px rgba(26, 86, 184, 0.35);
+}
+
+.btn-info:hover,
+.meeting-btn-view:hover {
+  background: var(--btn-info-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(26, 86, 184, 0.5);
+}
+
+.btn-info:active,
+.meeting-btn-view:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 8px rgba(26, 86, 184, 0.3);
+}
+
+/* Delete button - Bright Red */
+.btn-danger,
+.complaint-item .actions .btn-danger,
+.meeting-btn-delete {
+  background: var(--btn-danger) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700 !important;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 10px rgba(185, 28, 28, 0.35);
+}
+
+.btn-danger:hover,
+.complaint-item .actions .btn-danger:hover,
+.meeting-btn-delete:hover {
+  background: var(--btn-danger-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(185, 28, 28, 0.5);
+}
+
+.btn-danger:active,
+.complaint-item .actions .btn-danger:active,
+.meeting-btn-delete:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.3);
+}
+
+/* ============================================================
+   MEETING BADGE - STATUS
+   ============================================================ */
+
+.badge-info {
+  background: var(--btn-info) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.badge-success {
+  background: var(--btn-success) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.badge-warning {
+  background: var(--btn-warning) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.badge-danger {
+  background: var(--btn-danger) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* ============================================================
+   MEETING CARD - TEXT COLORS
+   ============================================================ */
+
+.card .flex-between {
+  color: var(--text);
+}
+
+.card .flex-between strong {
+  color: var(--text) !important;
+  font-size: 1.1rem;
+}
+
+[data-theme="dark"] .card .flex-between strong {
+  color: #ffffff !important;
+}
+
+.card .text-muted,
+.card .meta-text {
+  color: var(--text) !important;
+  opacity: 0.85;
+}
+
+/* Meeting location and date text */
+.card [style*="color:var(--text-muted)"],
+.card .location-text,
+.card .date-text {
+  color: var(--text) !important;
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .card [style*="color:var(--text-muted)"],
+[data-theme="dark"] .card .location-text,
+[data-theme="dark"] .card .date-text {
+  color: #e5e7eb !important;
+  opacity: 0.9;
+}
+
+/* ============================================================
+   MEETING CARD - IMPROVED VISIBILITY
+   ============================================================ */
+
+.card .meeting-description {
+  color: var(--text);
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: var(--surface-alt);
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+}
+
+[data-theme="dark"] .card .meeting-description {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Meeting attendees count - more visible */
+.card .attendees-count {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Meeting municipality badge */
+.card .muni-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--primary);
+  color: #ffffff;
+}
+
+/* ============================================================
+   ENHANCED BUTTON STYLES - More Vibrant
+   ============================================================ */
+
+.btn-sm {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.875rem;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   ENHANCED BUTTON STYLES - More Vibrant
+   ============================================================ */
+
+.btn-success {
+  background: var(--btn-success);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.btn-success:hover {
+  background: var(--btn-success-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);
+}
+
+.btn-warning {
+  background: var(--btn-warning);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+}
+
+.btn-warning:hover {
+  background: var(--btn-warning-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+.btn-danger {
+  background: var(--btn-danger);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+
+.btn-danger:hover {
+  background: var(--btn-danger-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+}
+
+.btn-info {
+  background: var(--btn-info);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.btn-info:hover {
+  background: var(--btn-info-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+}
+
+/* Meeting card button improvements */
+.complaint-item .actions .btn-success,
+.complaint-item .actions .btn-warning,
+.complaint-item .actions .btn-danger {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  min-width: 90px;
+  justify-content: center;
 }
 
 /* ============================================================
@@ -81,6 +985,7 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 1000;
+  transition: all var(--transition);
 }
 
 .accessibility-bar .label {
@@ -113,6 +1018,18 @@ textarea {
 .accessibility-bar button:active {
   transform: translateY(0px);
   background: rgba(255, 255, 255, 0.35);
+}
+
+/* Contrast button indicator */
+#aContrastToggle.active {
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid #ffffff;
+}
+
+[data-theme="light"] #aContrastToggle.active {
+  background: rgba(0, 0, 0, 0.2);
+  border: 2px solid #000000;
+  color: #000000;
 }
 
 .speech-indicator {
@@ -227,6 +1144,7 @@ textarea {
   color: white;
   position: relative;
   overflow: hidden;
+  transition: background var(--transition);
 }
 
 .login-brand-section::before {
@@ -776,76 +1694,6 @@ textarea {
   border-color: var(--primary-dark);
 }
 
-.btn-success {
-  background: #16a34a;
-  color: white;
-}
-
-.btn-success:hover {
-  background: #15803d;
-  box-shadow: 0 4px 15px rgba(22, 163, 74, 0.35);
-  transform: translateY(-2px);
-}
-
-.btn-success:active {
-  background: #14532d;
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover {
-  background: #d97706;
-  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);
-  transform: translateY(-2px);
-}
-
-.btn-warning:active {
-  background: #b45309;
-}
-
-.btn-danger {
-  background: #dc2626;
-  color: white;
-}
-
-.btn-danger:hover {
-  background: #b91c1c;
-  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.35);
-  transform: translateY(-2px);
-}
-
-.btn-danger:active {
-  background: #991b1b;
-}
-
-.btn-info {
-  background: #2563eb;
-  color: white;
-}
-
-.btn-info:hover {
-  background: #1d4ed8;
-  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35);
-  transform: translateY(-2px);
-}
-
-.btn-info:active {
-  background: #1e40af;
-}
-
-.btn-secondary {
-  background: var(--text-muted);
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: var(--text);
-  transform: translateY(-2px);
-}
-
 .btn-sm {
   padding: 0.6rem 1.1rem;
   font-size: 0.875rem;
@@ -933,6 +1781,7 @@ textarea {
   position: sticky;
   top: 56px;
   z-index: 900;
+  transition: background var(--transition), border-color var(--transition);
 }
 
 .navbar .brand {
@@ -969,6 +1818,7 @@ textarea {
   padding: 0.55rem 0.95rem;
   border-radius: 999px;
   transition: all 0.25s ease;
+  cursor: pointer;
 }
 
 .navbar .logout-btn:hover {
@@ -1010,6 +1860,7 @@ textarea {
   border-radius: 24px;
   padding: 1rem;
   min-height: calc(100vh - 128px);
+  transition: background var(--transition), border-color var(--transition);
 }
 
 .sidebar-header {
@@ -1239,6 +2090,7 @@ tbody tr:hover {
   align-items: center;
   padding: 1rem;
   z-index: 2000;
+  transition: background var(--transition);
 }
 
 .modal-overlay.active {
