@@ -2081,6 +2081,9 @@ tbody tr:hover {
 /* ============================================================
    MODALS (PRESERVED & ENHANCED)
    ============================================================ */
+/* ============================================================
+   MODALS (PRESERVED & ENHANCED) - FIXED
+   ============================================================ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -2104,8 +2107,85 @@ tbody tr:hover {
   background: var(--surface);
   border-radius: 24px;
   padding: 1.75rem;
+  padding-top: 3rem; /* ADD THIS - Extra padding at top for close button */
   box-shadow: var(--shadow);
   position: relative;
+}
+
+/* Close button - fixed positioning */
+.close-modal {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.25s ease;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10; /* ADD THIS - Ensure it's above other content */
+  line-height: 1;
+}
+
+.close-modal:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  transform: rotate(90deg);
+}
+
+.close-modal:active {
+  transform: rotate(90deg) scale(0.9);
+}
+
+/* Make sure the modal content doesn't overlap the close button */
+.modal-box .modal-content,
+.modal-box > *:not(.close-modal) {
+  padding-top: 0.5rem;
+}
+
+/* For modals with h3 at top */
+.modal-box h3:first-of-type {
+  margin-top: 0.25rem;
+  padding-right: 2.5rem; /* ADD THIS - Prevent text from going under close button */
+}
+
+/* Fix for the "Manage User Permissions" modal header */
+.modal-box h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  padding-right: 2.5rem; /* ADD THIS - Prevent text from going under close button */
+}
+
+/* Ensure the close button doesn't overlap scrollbar */
+.modal-box {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.modal-box::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-box::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.modal-box::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 /* Modal Form Styles - Enhanced for all modals */

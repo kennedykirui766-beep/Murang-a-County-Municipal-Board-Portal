@@ -672,10 +672,28 @@ function deleteUser(id) {
 }
 
 function showModal(content) {
+  let overlay = byId('modalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'modalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box" id="modalBox">
+        <button class="close-modal" id="modalClose">&times;</button>
+        <div id="modalBody" class="modal-content"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    byId('modalClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', event => {
+      if (event.target === event.currentTarget) closeModal();
+    });
+  }
+  
   const body = byId('modalBody');
   if (body) body.innerHTML = content;
-  const overlay = byId('modalOverlay');
-  if (overlay) overlay.classList.add('active');
+  overlay.classList.add('active');
 }
 
 function closeModal() {
