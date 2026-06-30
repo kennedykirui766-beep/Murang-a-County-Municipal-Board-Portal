@@ -36,6 +36,11 @@
       </div>
       <div class="nav-actions">
         <span class="user-badge"><i class="fas fa-user-circle"></i> <span id="navUserName">User</span> (<span id="navUserRole">role</span>)</span>
+        <!-- Add after Manage Users -->
+<div class="nav-item" data-page="permissions" id="navPermissions" style="display:none;">
+  <i class="fas fa-shield-alt"></i> Permissions
+  <span class="badge badge-info" style="font-size:0.6rem; margin-left:auto;">Admin</span>
+</div>
         <span class="user-badge" style="background:var(--gray-200);color:var(--gray-700);" id="navMunicipality">Municipality</span>
         <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
@@ -56,8 +61,21 @@
         <div class="nav-item" data-page="complaints"><i class="fas fa-exclamation-triangle"></i> Complaints</div>
         <div class="nav-item" data-page="documents"><i class="fas fa-folder-open"></i> Documents</div>
         <div class="nav-item" data-page="emails"><i class="fas fa-envelope"></i> Email</div>
-        <div class="nav-section">System</div>
-        <div class="nav-item" data-page="users" id="navUsers"><i class="fas fa-user-cog"></i> Manage Users</div>
+        
+        <!-- Addition -->
+<div class="nav-section">System</div>
+<div class="nav-item" data-page="users" id="navUsers"><i class="fas fa-user-cog"></i> Manage Users</div>
+<div class="nav-item" data-page="permissions" id="navPermissions" style="display:none;">
+  <i class="fas fa-shield-alt"></i> Permissions
+  <span class="badge badge-info" style="font-size:0.6rem; margin-left:auto;">Admin</span>
+</div>
+<div class="nav-item" data-page="track" id="navTrack" style="display:none;"><i class="fas fa-map-marker-alt"></i> Track Users</div>
+<div class="nav-item" data-page="approvals" id="navApprovals" style="display:none;">
+  <i class="fas fa-user-check"></i> Approvals
+  <span id="approvalsBadge" style="display:none; background:var(--danger); color:white; border-radius:50%; padding:0.1rem 0.5rem; font-size:0.7rem; margin-left:auto; font-weight:600; min-width:20px; text-align:center;">0</span>
+</div>
+
+        
         <div class="nav-item" data-page="track" id="navTrack" style="display:none;"><i class="fas fa-map-marker-alt"></i> Track Users</div>
         <div class="nav-item" data-page="approvals" id="navApprovals" style="display:none;">
           <i class="fas fa-user-check"></i> Approvals

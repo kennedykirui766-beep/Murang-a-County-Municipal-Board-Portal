@@ -246,3 +246,26 @@ function showCreateAccountModal() {
 // Expose functions globally
 window.closeCreateAccountModal = closeCreateAccountModal;
 window.showCreateAccountModal = showCreateAccountModal;
+// toggle-password.js - Password visibility toggle for all pages
+document.addEventListener('DOMContentLoaded', function() {
+  // Toggle password visibility for all password toggle buttons
+  document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const input = this.closest('.password-input-group').querySelector('input');
+      const eyeIcon = this.querySelector('.eye-icon');
+      const eyeOffIcon = this.querySelector('.eye-off-icon');
+      
+      if (input.type === 'password') {
+        input.type = 'text';
+        if (eyeIcon) eyeIcon.style.display = 'none';
+        if (eyeOffIcon) eyeOffIcon.style.display = 'block';
+        this.setAttribute('aria-pressed', 'true');
+      } else {
+        input.type = 'password';
+        if (eyeIcon) eyeIcon.style.display = 'block';
+        if (eyeOffIcon) eyeOffIcon.style.display = 'none';
+        this.setAttribute('aria-pressed', 'false');
+      }
+    });
+  });
+});

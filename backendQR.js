@@ -1,4 +1,4 @@
-// c:\projo\app_backend.js
+// Not necessary already integrated on the backendapp.js
 
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
