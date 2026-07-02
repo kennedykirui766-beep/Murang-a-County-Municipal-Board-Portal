@@ -2,10 +2,13 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, date
 import os
 import json
+import time
+from sqlalchemy.exc import OperationalError
 
 # --- Import Reports & Audit Modules ---
 from report_routes import reports_bp
@@ -13,17 +16,60 @@ from audit import AuditLogger, get_client_ip
 
 # --- App Configuration ---
 app = Flask(__name__, static_folder='.')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///municipal_board.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///municipal_board.db?check_same_thread=False'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file upload
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+    'pool_timeout': 30,
+    'max_overflow': 20
+}
 
 CORS(app)
 
+# --- Initialize Database ---
 from models import db
 db.init_app(app)
 
+# --- Initialize Migrations ---
+migrate = Migrate(app, db)
+
 # --- Register Reports Blueprint ---
 app.register_blueprint(reports_bp)
+
+# --- Database commit with retry logic ---
+def commit_with_retry(max_retries=3, delay=0.5):
+    """Commit with retry logic for SQLite lock errors"""
+    for attempt in range(max_retries):
+        try:
+            db.session.commit()
+            return True
+        except OperationalError as e:
+            if 'database is locked' in str(e) and attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))
+                db.session.rollback()
+                continue
+            raise
+    return False
+
+def safe_commit():
+    """Wrapper for commit_with_retry with error handling"""
+    try:
+        commit_with_retry()
+        return True, None
+    except Exception as e:
+        db.session.rollback()
+        return False, str(e)
+
+# --- Create tables if they don't exist ---
+with app.app_context():
+    try:
+        db.create_all()
+        print("Database tables verified/created")
+    except Exception as e:
+        print(f"Database initialization warning: {e}")
 
 # --- Routes to Serve the Frontend HTML Pages ---
 
@@ -39,7 +85,9 @@ def home():
 def settings():
     return send_from_directory('.', 'settings.html')
 
-# --- API Endpoints ---
+# ============================================================
+# API ENDPOINTS - SPECIFIC ROUTES FIRST (BEFORE GENERIC ONES)
+# ============================================================
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -52,7 +100,6 @@ def login():
     user = User.query.filter_by(email=email).first()
     
     if not user:
-        # Log failed login attempt
         AuditLogger.log_action(
             user_id=None,
             user_name='Unknown',
@@ -65,14 +112,12 @@ def login():
         )
         return jsonify({'error': 'Invalid email or password'}), 401
     
-    # Check password
     try:
         is_valid = check_password_hash(user.password, password)
     except Exception as e:
         return jsonify({'error': 'Login error. Please try again.'}), 500
     
     if not is_valid:
-        # Log failed login attempt
         AuditLogger.log_action(
             user_id=user.id,
             user_name=user.name,
@@ -86,7 +131,6 @@ def login():
         )
         return jsonify({'error': 'Invalid email or password'}), 401
     
-    # Only check approval for members
     if user.role == 'member' and not user.is_approved:
         return jsonify({'error': 'Account pending approval. Please wait for admin approval.'}), 403
     
@@ -94,9 +138,10 @@ def login():
         return jsonify({'error': 'Account has been rejected. Please contact administrator.'}), 403
     
     user.last_seen = datetime.utcnow().isoformat()
-    db.session.commit()
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
     
-    # Log successful login
     AuditLogger.log_action(
         user_id=user.id,
         user_name=user.name,
@@ -164,9 +209,10 @@ def oauth_login():
             joined=str(date.today())
         )
         db.session.add(new_member)
-        db.session.commit()
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
         
-        # Log OAuth registration
         AuditLogger.log_action(
             user_id=user.id,
             user_name=user.name,
@@ -184,9 +230,10 @@ def oauth_login():
         if user.role == 'member' and user.is_rejected:
             return jsonify({'error': 'Account has been rejected. Please contact administrator.'}), 403
         user.last_seen = datetime.utcnow().isoformat()
-        db.session.commit()
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
         
-        # Log OAuth login
         AuditLogger.log_action(
             user_id=user.id,
             user_name=user.name,
@@ -212,7 +259,9 @@ def heartbeat():
     user = User.query.get(user_id)
     if user:
         user.last_seen = datetime.utcnow().isoformat()
-        db.session.commit()
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
         return jsonify({'status': 'success'}), 200
     return jsonify({'error': 'User not found'}), 404
 
@@ -228,15 +277,12 @@ def register():
     role = data.get('role', 'member')
     municipality = data.get('municipality')
     
-    # Check if user already exists
     existing_user = User.query.filter_by(email=email).first()
     if existing_user:
         return jsonify({'error': 'Email already exists'}), 400
         
-    # Hash the password
     hashed_password = generate_password_hash(password)
     
-    # Create user with the hashed password
     new_user = User(
         name=name,
         email=email,
@@ -256,7 +302,6 @@ def register():
     db.session.add(new_user)
     db.session.flush()
     
-    # Add to members table
     new_member = Member(
         name=name,
         email=email,
@@ -267,9 +312,10 @@ def register():
     db.session.add(new_member)
     
     try:
-        db.session.commit()
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
         
-        # Log registration
         AuditLogger.log_action(
             user_id=new_user.id,
             user_name=new_user.name,
@@ -311,9 +357,10 @@ def reset_password(user_id):
         return jsonify({'error': 'User not found'}), 404
     
     user.password = generate_password_hash(new_password)
-    db.session.commit()
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
     
-    # Log password reset
     AuditLogger.log_action(
         user_id=user.id,
         user_name=user.name,
@@ -333,6 +380,347 @@ def reset_password(user_id):
     })
 
 
+# ============================================================
+# SPECIFIC ROUTES - PROJECTS (BEFORE GENERIC ROUTES)
+# ============================================================
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    from models import Project
+    
+    municipality = request.args.get('municipality')
+    status = request.args.get('status')
+    
+    query = Project.query
+    if municipality:
+        query = query.filter(Project.municipality == municipality)
+    if status:
+        query = query.filter(Project.status == status)
+    
+    projects = query.all()
+    return jsonify([p.to_dict() for p in projects]), 200
+
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    from models import Project
+    
+    data = request.json
+    
+    if not data.get('name') or not data.get('municipality'):
+        return jsonify({'error': 'Name and municipality are required'}), 400
+    
+    files = data.get('files', [])
+    if isinstance(files, list):
+        data['files'] = json.dumps(files)
+    
+    project = Project(
+        name=data.get('name'),
+        description=data.get('description', ''),
+        municipality=data.get('municipality'),
+        status=data.get('status', 'planning'),
+        priority=data.get('priority', 'medium'),
+        category=data.get('category', ''),
+        budget=data.get('budget', 0),
+        spent=data.get('spent', 0),
+        start_date=data.get('start_date', ''),
+        end_date=data.get('end_date', ''),
+        created_by=data.get('created_by', 'System'),
+        created_date=datetime.utcnow().isoformat(),
+        last_updated=datetime.utcnow().isoformat(),
+        progress=data.get('progress', 0),
+        files=data['files']
+    )
+    
+    db.session.add(project)
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    return jsonify(project.to_dict()), 201
+
+
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+def get_project(project_id):
+    from models import Project
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    return jsonify(project.to_dict()), 200
+
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    from models import Project
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    
+    data = request.json
+    
+    for key, value in data.items():
+        if key == 'files' and isinstance(value, list):
+            value = json.dumps(value)
+        if hasattr(project, key) and key != 'id':
+            setattr(project, key, value)
+    
+    project.last_updated = datetime.utcnow().isoformat()
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    return jsonify(project.to_dict()), 200
+
+
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    from models import Project, ProjectMilestone, ProjectUpdate
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+    
+    ProjectMilestone.query.filter_by(project_id=project_id).delete()
+    ProjectUpdate.query.filter_by(project_id=project_id).delete()
+    
+    db.session.delete(project)
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    return jsonify({'message': 'Project deleted successfully'}), 200
+
+
+@app.route('/api/projects/<int:project_id>/milestones', methods=['GET'])
+def get_project_milestones(project_id):
+    from models import ProjectMilestone
+    
+    milestones = ProjectMilestone.query.filter_by(project_id=project_id).all()
+    return jsonify([m.to_dict() for m in milestones]), 200
+
+
+@app.route('/api/projects/<int:project_id>/milestones', methods=['POST'])
+def create_project_milestone(project_id):
+    from models import ProjectMilestone
+    
+    data = request.json
+    
+    milestone = ProjectMilestone(
+        project_id=project_id,
+        name=data.get('name'),
+        description=data.get('description', ''),
+        due_date=data.get('due_date', ''),
+        completed_date=data.get('completed_date', ''),
+        status=data.get('status', 'pending'),
+        progress=data.get('progress', 0)
+    )
+    
+    db.session.add(milestone)
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    return jsonify(milestone.to_dict()), 201
+
+
+@app.route('/api/projects/<int:project_id>/updates', methods=['GET'])
+def get_project_updates(project_id):
+    from models import ProjectUpdate
+    
+    updates = ProjectUpdate.query.filter_by(project_id=project_id).order_by(
+        ProjectUpdate.timestamp.desc()
+    ).all()
+    return jsonify([u.to_dict() for u in updates]), 200
+
+
+@app.route('/api/projects/<int:project_id>/updates', methods=['POST'])
+def create_project_update(project_id):
+    from models import ProjectUpdate, Project
+    
+    data = request.json
+    
+    files = data.get('files', [])
+    if isinstance(files, list):
+        files = json.dumps(files)
+    
+    update = ProjectUpdate(
+        project_id=project_id,
+        user_id=data.get('user_id', 1),
+        user_name=data.get('user_name', 'System'),
+        message=data.get('message', ''),
+        progress=data.get('progress', 0),
+        files=files
+    )
+    
+    db.session.add(update)
+    
+    project = Project.query.get(project_id)
+    if project and 'progress' in data:
+        project.progress = data.get('progress', project.progress)
+        project.last_updated = datetime.utcnow().isoformat()
+    
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    return jsonify(update.to_dict()), 201
+
+
+@app.route('/api/projects/dashboard-stats', methods=['GET'])
+def get_project_stats():
+    from models import Project
+    
+    municipality = request.args.get('municipality')
+    
+    query = Project.query
+    if municipality:
+        query = query.filter(Project.municipality == municipality)
+    
+    projects = query.all()
+    
+    stats = {
+        'total': len(projects),
+        'planning': sum(1 for p in projects if p.status == 'planning'),
+        'active': sum(1 for p in projects if p.status == 'active'),
+        'on_hold': sum(1 for p in projects if p.status == 'on_hold'),
+        'completed': sum(1 for p in projects if p.status == 'completed'),
+        'cancelled': sum(1 for p in projects if p.status == 'cancelled'),
+        'total_budget': sum(p.budget for p in projects),
+        'total_spent': sum(p.spent for p in projects),
+        'avg_progress': sum(p.progress for p in projects) / len(projects) if projects else 0
+    }
+    
+    return jsonify(stats), 200
+
+
+# ============================================================
+# SPECIFIC ROUTES - MEETING ATTENDANCE
+# ============================================================
+
+@app.route('/api/meetings/<int:meeting_id>/attendance', methods=['GET'])
+def get_meeting_attendance(meeting_id):
+    from models import MeetingAttendance
+    
+    attendance = MeetingAttendance.query.filter_by(meeting_id=meeting_id).all()
+    return jsonify([a.to_dict() for a in attendance]), 200
+
+
+@app.route('/api/meetings/<int:meeting_id>/attendance', methods=['POST'])
+def record_meeting_attendance(meeting_id):
+    from models import MeetingAttendance, Meeting
+    
+    data = request.json
+    user_id = data.get('user_id')
+    user_name = data.get('user_name')
+    user_email = data.get('user_email')
+    check_in_method = data.get('check_in_method', 'manual')
+    location_lat = data.get('location_lat')
+    location_lng = data.get('location_lng')
+    location_accuracy = data.get('location_accuracy')
+    is_verified = data.get('is_verified', False)
+    verified_by = data.get('verified_by')
+    notes = data.get('notes')
+    
+    if not user_id or not user_name or not user_email:
+        return jsonify({'error': 'User information required'}), 400
+    
+    existing = MeetingAttendance.query.filter_by(
+        meeting_id=meeting_id, 
+        user_id=user_id
+    ).first()
+    
+    if existing:
+        return jsonify({'error': 'User already checked in'}), 400
+    
+    attendance = MeetingAttendance(
+        meeting_id=meeting_id,
+        user_id=user_id,
+        user_name=user_name,
+        user_email=user_email,
+        check_in_method=check_in_method,
+        location_lat=location_lat,
+        location_lng=location_lng,
+        location_accuracy=location_accuracy,
+        is_verified=is_verified,
+        verified_by=verified_by,
+        notes=notes
+    )
+    
+    db.session.add(attendance)
+    
+    # Also add to meeting attendees list
+    meeting = Meeting.query.get(meeting_id)
+    if meeting:
+        attendees = json.loads(meeting.attendees) if meeting.attendees else []
+        if user_email not in attendees:
+            attendees.append(user_email)
+            meeting.attendees = json.dumps(attendees)
+    
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    
+    return jsonify(attendance.to_dict()), 201
+
+
+@app.route('/api/meetings/<int:meeting_id>/attendance/bulk', methods=['POST'])
+def bulk_record_attendance(meeting_id):
+    from models import MeetingAttendance, Meeting
+    
+    data = request.json
+    attendees = data.get('attendees', [])
+    verified_by = data.get('verified_by', 'System')
+    
+    if not attendees:
+        return jsonify({'error': 'No attendees provided'}), 400
+    
+    recorded = []
+    for attendee in attendees:
+        user_id = attendee.get('user_id')
+        user_name = attendee.get('user_name')
+        user_email = attendee.get('user_email')
+        
+        if not user_id or not user_name or not user_email:
+            continue
+            
+        existing = MeetingAttendance.query.filter_by(
+            meeting_id=meeting_id,
+            user_id=user_id
+        ).first()
+        
+        if existing:
+            continue
+            
+        attendance = MeetingAttendance(
+            meeting_id=meeting_id,
+            user_id=user_id,
+            user_name=user_name,
+            user_email=user_email,
+            check_in_method='bulk',
+            is_verified=True,
+            verified_by=verified_by,
+            notes='Bulk attendance entry'
+        )
+        db.session.add(attendance)
+        recorded.append(attendance)
+    
+    # Update meeting attendees
+    meeting = Meeting.query.get(meeting_id)
+    if meeting:
+        attendees_list = json.loads(meeting.attendees) if meeting.attendees else []
+        for att in recorded:
+            if att.user_email not in attendees_list:
+                attendees_list.append(att.user_email)
+        meeting.attendees = json.dumps(attendees_list)
+    
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
+    
+    return jsonify([a.to_dict() for a in recorded]), 201
+
+
+# ============================================================
+# GENERIC CRUD ROUTES - FOR ALL OTHER ENTITIES
+# ============================================================
+
 def get_model(entity_name):
     from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast
     return {
@@ -347,46 +735,53 @@ def get_model(entity_name):
     }.get(entity_name)
 
 
+def get_valid_model_fields(Model):
+    """Get list of valid column names for a model"""
+    return [c.name for c in Model.__table__.columns]
+
+
+def filter_valid_fields(data, Model):
+    """Filter data to only include fields that exist in the model"""
+    valid_fields = get_valid_model_fields(Model)
+    return {k: v for k, v in data.items() if k in valid_fields}
+
+
 @app.route('/api/<entity>', methods=['GET'])
 def get_entity(entity):
+    # Skip if it's a project (already handled)
+    if entity == 'projects':
+        return get_projects()
+    
     Model = get_model(entity)
     if not Model: 
         return jsonify([]), 404
     items = Model.query.all()
-    
-    # Log view action for important entities
-    if entity in ['users', 'meetings', 'complaints', 'minutes', 'documents']:
-        try:
-            # Try to get user from request (simplified - you may want proper auth)
-            user_id = request.args.get('user_id', 1)
-            user = User.query.get(user_id)
-            if user:
-                AuditLogger.log_action(
-                    user_id=user.id,
-                    user_name=user.name,
-                    user_email=user.email,
-                    action='VIEW',
-                    category=entity.capitalize(),
-                    entity_type=entity[:-1] if entity.endswith('s') else entity,
-                    municipality=user.municipality
-                )
-        except:
-            pass
-    
     return jsonify([item.to_dict() for item in items]), 200
 
 
 @app.route('/api/<entity>', methods=['POST'])
 def add_entity_item(entity):
+    # Skip if it's a project (already handled)
+    if entity == 'projects':
+        return create_project()
+    
     Model = get_model(entity)
     if not Model: 
         return jsonify({'error': 'Entity not found'}), 404
     
     data = request.json
-    
-    # Try to get current user
-    current_user = None
     current_user_id = data.get('user_id') or data.get('created_by') or 1
+    
+    # --- Handle Email field mapping ---
+    if entity == 'emails':
+        # Map 'from' to 'from_email' for the Email model
+        if 'from' in data:
+            data['from_email'] = data.pop('from')
+        # Map 'to' to 'to_email' if needed
+        if 'to' in data:
+            data['to_email'] = data.pop('to')
+        # Filter to only valid fields
+        data = filter_valid_fields(data, Model)
     
     if entity == 'users':
         if 'password' in data and data['password']:
@@ -484,76 +879,28 @@ def add_entity_item(entity):
                 data['files'] = json.dumps([])
         else:
             data['files'] = json.dumps([])
-
-    new_item = Model(**data)
-    db.session.add(new_item)
-    db.session.commit()
     
-    # Log the creation
+    # Filter data to only valid fields for the model
+    data = filter_valid_fields(data, Model)
+    
     try:
-        user_name = data.get('name') or data.get('submittedBy') or data.get('uploadedBy') or data.get('sender') or 'System'
-        user_email = data.get('email') or data.get('sender') or ''
-        
-        category_map = {
-            'users': 'Users',
-            'members': 'Members',
-            'meetings': 'Meetings',
-            'complaints': 'Complaints',
-            'minutes': 'Minutes',
-            'documents': 'Documents',
-            'emails': 'Emails',
-            'broadcasts': 'Broadcasts'
-        }
-        
-        entity_type_map = {
-            'users': 'user',
-            'members': 'member',
-            'meetings': 'meeting',
-            'complaints': 'complaint',
-            'minutes': 'minute',
-            'documents': 'document',
-            'emails': 'email',
-            'broadcasts': 'broadcast'
-        }
-        
-        # Log the action
-        AuditLogger.log_action(
-            user_id=current_user_id,
-            user_name=user_name,
-            user_email=user_email,
-            action='CREATE',
-            category=category_map.get(entity, 'System'),
-            entity_type=entity_type_map.get(entity, entity),
-            entity_id=new_item.id if hasattr(new_item, 'id') else None,
-            details={'entity': entity, 'data': {k: v for k, v in data.items() if k not in ['password']}},
-            municipality=data.get('municipality')
-        )
-        
-        # Log system activity for important events
-        if entity in ['meetings', 'complaints', 'users']:
-            description_map = {
-                'meetings': f'Meeting "{data.get("title", "Untitled")}" created',
-                'complaints': f'Complaint "{data.get("title", "Untitled")}" submitted',
-                'users': f'New user {data.get("name", "Unknown")} created'
-            }
-            AuditLogger.log_system_activity(
-                user_id=current_user_id,
-                user_name=user_name,
-                activity_type=f'{entity[:-1]}_created',
-                description=description_map.get(entity, f'{entity} item created'),
-                entity_type=entity_type_map.get(entity, entity),
-                entity_id=new_item.id if hasattr(new_item, 'id') else None,
-                municipality=data.get('municipality')
-            )
+        new_item = Model(**data)
+        db.session.add(new_item)
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
+        return jsonify(new_item.to_dict()), 201
     except Exception as e:
-        # Don't fail the request if logging fails
-        pass
-    
-    return jsonify(new_item.to_dict()), 201
+        db.session.rollback()
+        return jsonify({'error': f'Error creating item: {str(e)}'}), 500
 
 
 @app.route('/api/<entity>/<int:item_id>', methods=['PUT'])
 def update_entity_item(entity, item_id):
+    # Skip if it's a project (already handled)
+    if entity == 'projects':
+        return update_project(item_id)
+    
     Model = get_model(entity)
     if not Model: 
         return jsonify({'error': 'Entity not found'}), 404
@@ -563,9 +910,18 @@ def update_entity_item(entity, item_id):
         return jsonify({'error': 'Item not found'}), 404
 
     updated_data = request.json
-    
-    # Get old data for audit
     old_data = item.to_dict() if hasattr(item, 'to_dict') else {}
+
+    # --- Handle Email field mapping ---
+    if entity == 'emails':
+        # Map 'from' to 'from_email' for the Email model
+        if 'from' in updated_data:
+            updated_data['from_email'] = updated_data.pop('from')
+        # Map 'to' to 'to_email' if needed
+        if 'to' in updated_data:
+            updated_data['to_email'] = updated_data.pop('to')
+        # Filter to only valid fields
+        updated_data = filter_valid_fields(updated_data, Model)
 
     if entity == 'users' and 'password' in updated_data and updated_data['password']:
         password = updated_data['password']
@@ -640,60 +996,29 @@ def update_entity_item(entity, item_id):
             else:
                 updated_data['files'] = json.dumps([])
 
-    for key, value in updated_data.items():
-        if hasattr(item, key) and key != 'id':
-            setattr(item, key, value)
-            
-    db.session.commit()
-    
-    # Log the update
+    # Filter to only valid fields for the model
+    updated_data = filter_valid_fields(updated_data, Model)
+
     try:
-        category_map = {
-            'users': 'Users',
-            'members': 'Members',
-            'meetings': 'Meetings',
-            'complaints': 'Complaints',
-            'minutes': 'Minutes',
-            'documents': 'Documents',
-            'emails': 'Emails',
-            'broadcasts': 'Broadcasts'
-        }
+        for key, value in updated_data.items():
+            if hasattr(item, key) and key != 'id':
+                setattr(item, key, value)
         
-        entity_type_map = {
-            'users': 'user',
-            'members': 'member',
-            'meetings': 'meeting',
-            'complaints': 'complaint',
-            'minutes': 'minute',
-            'documents': 'document',
-            'emails': 'email',
-            'broadcasts': 'broadcast'
-        }
-        
-        user_name = getattr(item, 'name', '') or getattr(item, 'submittedBy', '') or getattr(item, 'uploadedBy', '') or 'System'
-        user_email = getattr(item, 'email', '') or ''
-        user_id_val = getattr(item, 'user_id', 1)
-        
-        AuditLogger.log_action(
-            user_id=user_id_val or 1,
-            user_name=user_name,
-            user_email=user_email,
-            action='UPDATE',
-            category=category_map.get(entity, 'System'),
-            entity_type=entity_type_map.get(entity, entity),
-            entity_id=item_id,
-            details={'old': old_data, 'new': updated_data},
-            municipality=getattr(item, 'municipality', None)
-        )
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
+        return jsonify(item.to_dict()), 200
     except Exception as e:
-        # Don't fail the request if logging fails
-        pass
-    
-    return jsonify(item.to_dict()), 200
+        db.session.rollback()
+        return jsonify({'error': f'Error updating item: {str(e)}'}), 500
 
 
 @app.route('/api/<entity>/<int:item_id>', methods=['DELETE'])
 def delete_entity_item(entity, item_id):
+    # Skip if it's a project (already handled)
+    if entity == 'projects':
+        return delete_project(item_id)
+    
     Model = get_model(entity)
     if not Model:
         return jsonify({'error': 'Entity not found'}), 404
@@ -702,67 +1027,28 @@ def delete_entity_item(entity, item_id):
     if not item:
         return jsonify({'error': 'Item not found'}), 404
     
-    # Store item data before deletion for audit
-    item_data = item.to_dict() if hasattr(item, 'to_dict') else {'id': item_id}
-    
-    db.session.delete(item)
-    db.session.commit()
-    
-    # Log the deletion
     try:
-        category_map = {
-            'users': 'Users',
-            'members': 'Members',
-            'meetings': 'Meetings',
-            'complaints': 'Complaints',
-            'minutes': 'Minutes',
-            'documents': 'Documents',
-            'emails': 'Emails',
-            'broadcasts': 'Broadcasts'
-        }
-        
-        entity_type_map = {
-            'users': 'user',
-            'members': 'member',
-            'meetings': 'meeting',
-            'complaints': 'complaint',
-            'minutes': 'minute',
-            'documents': 'document',
-            'emails': 'email',
-            'broadcasts': 'broadcast'
-        }
-        
-        user_name = item_data.get('name', '') or item_data.get('submittedBy', '') or item_data.get('uploadedBy', '') or item_data.get('sender', '') or 'System'
-        user_email = item_data.get('email', '') or ''
-        user_id_val = item_data.get('user_id', 1)
-        
-        AuditLogger.log_action(
-            user_id=user_id_val or 1,
-            user_name=user_name,
-            user_email=user_email,
-            action='DELETE',
-            category=category_map.get(entity, 'System'),
-            entity_type=entity_type_map.get(entity, entity),
-            entity_id=item_id,
-            details={'deleted_item': item_data},
-            municipality=item_data.get('municipality')
-        )
+        db.session.delete(item)
+        success, error = safe_commit()
+        if not success:
+            return jsonify({'error': f'Database error: {error}'}), 500
+        return jsonify({'message': 'Item deleted successfully'}), 200
     except Exception as e:
-        # Don't fail the request if logging fails
-        pass
-    
-    return jsonify({'message': 'Item deleted successfully'}), 200
+        db.session.rollback()
+        return jsonify({'error': f'Error deleting item: {str(e)}'}), 500
 
 
 @app.route('/api/<entity>', methods=['PUT'])
 def replace_entity_list(entity):
+    # Skip if it's a project (already handled)
+    if entity == 'projects':
+        return jsonify({'error': 'Use specific project routes for updates'}), 405
+    
     Model = get_model(entity)
     if not Model: 
         return jsonify({'error': 'Entity not found'}), 404
     
     new_list_data = request.json
-    
-    # Get old count for audit
     old_count = Model.query.count()
     
     Model.query.delete()
@@ -838,27 +1124,15 @@ def replace_entity_list(entity):
                 item_data['files'] = json.dumps(files)
             elif not isinstance(files, str):
                 item_data['files'] = json.dumps([])
-                
+        
+        # Filter to valid fields
+        item_data = filter_valid_fields(item_data, Model)
         new_items.append(Model(**item_data))
         
     db.session.add_all(new_items)
-    db.session.commit()
-    
-    # Log the bulk replace
-    try:
-        AuditLogger.log_action(
-            user_id=1,  # System user
-            user_name='System',
-            user_email='system@localhost',
-            action='REPLACE',
-            category='System',
-            entity_type=entity,
-            details={'old_count': old_count, 'new_count': len(new_items)},
-            municipality=None
-        )
-    except Exception as e:
-        pass
-    
+    success, error = safe_commit()
+    if not success:
+        return jsonify({'error': f'Database error: {error}'}), 500
     return jsonify([item.to_dict() for item in new_items]), 200
 
 

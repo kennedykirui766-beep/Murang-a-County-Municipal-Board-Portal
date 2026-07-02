@@ -283,7 +283,8 @@ async function navigate(page) {
     case 'broadcasts': await renderBroadcasts(); break;
     case 'approvals': await renderApprovals(); break;
     case 'permissions': await renderPermissions(); break;
-    case 'reports': await renderReports(); break;  // <-- MUST HAVE THIS
+    case 'reports': await renderReports(); break; 
+    case 'projects': await renderProjects(); break;
     default: render('<div class="card"><h2>Page not found</h2></div>');
   }
 }
@@ -1260,6 +1261,8 @@ async function renderMeetings() {
               ${isDeclined.comments ? `<br /><span style="font-size:0.8rem;color:var(--text-muted);">📝 ${isDeclined.comments}</span>` : ''}
             </div>
           ` : ''}
+          
+          <!-- ACTION BUTTONS - ROW 1: Attendance -->
           <div class="actions" style="margin-top:0.85rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
             ${!isAttending && !isDeclined ? `
               <button class="btn btn-success btn-sm" onclick="confirmAttendance(${meeting.id})">
@@ -1279,29 +1282,53 @@ async function renderMeetings() {
                 <i class="fas fa-check"></i> Change to Attend
               </button>
             ` : ''}
-            
-            <!-- QR CODE ATTENDANCE BUTTONS - Only show for scheduled meetings -->
+          </div>
+          
+          <!-- ACTION BUTTONS - ROW 2: QR & Attendance Management -->
+          <div class="actions" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem;">
             ${meeting.status === 'scheduled' ? `
               ${canGenerateQR ? `
-                <button class="btn btn-qr-generate btn-sm" onclick="showGenerateQRModal(${meeting.id})">
+                <button class="btn btn-qr-generate btn-sm" onclick="showGenerateQRModal(${meeting.id})" style="background:#7c3aed;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
                   <i class="fas fa-qrcode"></i> QR Code
                 </button>
               ` : ''}
-              <button class="btn btn-qr-scan btn-sm" onclick="showScanQRModal(${meeting.id})">
+              <button class="btn btn-qr-scan btn-sm" onclick="showScanQRModal(${meeting.id})" style="background:#059669;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
                 <i class="fas fa-camera"></i> Scan QR
               </button>
             ` : ''}
             
+            <!-- NEW: Physical Attendance Button -->
+            <button class="btn btn-physical-attendance btn-sm" onclick="recordPhysicalAttendance(${meeting.id})" style="background:#2563eb;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+              <i class="fas fa-user-check"></i> Record Physical
+            </button>
+            
+            <!-- NEW: View Physical Attendance -->
+            <button class="btn btn-view-attendance btn-sm" onclick="viewPhysicalAttendance(${meeting.id})" style="background:#0891b2;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+              <i class="fas fa-clipboard-list"></i> View Attendance
+            </button>
+            
+            <!-- NEW: Bulk Entry (Admin only) -->
             ${canAdd ? `
-              <button class="btn btn-info btn-sm" onclick="viewAttendance(${meeting.id})">
-                <i class="fas fa-list"></i> View Attendance
+              <button class="btn btn-bulk-entry btn-sm" onclick="bulkAttendanceModal(${meeting.id})" style="background:#8b5cf6;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+                <i class="fas fa-users"></i> Bulk Entry
               </button>
-              ${hasFiles ? `<button class="btn btn-secondary btn-sm" onclick="viewMeetingFiles(${meeting.id})"><i class="fas fa-paperclip"></i> Files (${meeting.files.length})</button>` : ''}
-              <button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})">
+            ` : ''}
+            
+            <!-- NEW: Export CSV (Admin only) -->
+            ${canAdd ? `
+              <button class="btn btn-export-csv btn-sm" onclick="exportAttendanceCSV(${meeting.id})" style="background:#16a34a;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
+                <i class="fas fa-file-csv"></i> Export CSV
+              </button>
+            ` : ''}
+            
+            ${canAdd ? `
+              ${hasFiles ? `<button class="btn btn-secondary btn-sm" onclick="viewMeetingFiles(${meeting.id})" style="background:var(--surface-alt);color:var(--text);border:1px solid var(--border);padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;"><i class="fas fa-paperclip"></i> Files (${meeting.files.length})</button>` : ''}
+              <button class="btn btn-danger btn-sm" onclick="deleteMeeting(${meeting.id})" style="background:#dc2626;color:white;border:none;padding:0.5rem 0.8rem;border-radius:999px;font-size:0.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.4rem;">
                 <i class="fas fa-trash"></i>
               </button>
             ` : ''}
           </div>
+          
           <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted);">
             ${getMunicipalityLabel(meeting.municipality)}
           </div>
@@ -1310,7 +1337,6 @@ async function renderMeetings() {
     </div>
   `);
 }
-
 async function confirmAttendance(id) {
   const meetings = await DB.meetings();
   const meeting = meetings.find(item => item.id === id);
@@ -2654,99 +2680,267 @@ async function showUploadMinutesModal() {
   const meetings = await DB.meetings();
   const allowedMeetings = getAllowedItems(meetings);
   
-  let meetingOptions = '<option value="">None (General Minutes)</option>';
-  allowedMeetings.forEach(meeting => {
-    meetingOptions += `<option value="${meeting.id}">${meeting.id} - ${meeting.title} (${formatDate(meeting.date)})</option>`;
-  });
+  // Sort meetings by date (newest first)
+  allowedMeetings.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  // Build meeting options with better formatting
+  let meetingOptions = '<option value="">-- Select a meeting --</option>';
+  if (allowedMeetings.length === 0) {
+    meetingOptions += '<option value="" disabled>No meetings available</option>';
+  } else {
+    allowedMeetings.forEach(meeting => {
+      const meetingDate = formatDate(meeting.date);
+      const statusBadge = meeting.status === 'scheduled' ? '📅' : meeting.status === 'completed' ? '✅' : '📋';
+      const attendeeCount = meeting.attendees ? meeting.attendees.length : 0;
+      meetingOptions += `<option value="${meeting.id}">
+        ${statusBadge} ${meeting.title} — ${meetingDate} at ${meeting.time} (${attendeeCount} attendees)
+      </option>`;
+    });
+  }
+  
+  const hasMeetings = allowedMeetings.length > 0;
 
   showModal(`
-    <h3><i class="fas fa-file-alt"></i> Upload Meeting Minutes</h3>
-    <form id="uploadMinutesForm" enctype="multipart/form-data">
-      <div class="form-group">
-        <label>Minutes Title <span style="color:var(--danger);">*</span></label>
-        <input type="text" id="minTitle" required placeholder="Enter minutes title (e.g., Kenol Budget Meeting Minutes)" />
+    <div style="max-height:80vh; overflow-y:auto; padding-right:0.5rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem;">
+        <i class="fas fa-file-alt" style="font-size:1.5rem; color:var(--primary);"></i>
+        <h3 style="margin:0;">Upload Meeting Minutes</h3>
       </div>
       
-      <div class="form-group">
-        <label>Summary / Key Points</label>
-        <textarea id="minSummary" rows="3" placeholder="Enter a brief summary of key decisions and outcomes..."></textarea>
-      </div>
-      
-      <div class="form-group">
-        <label>Content / Description <span style="color:var(--danger);">*</span></label>
-        <textarea id="minContent" rows="5" required placeholder="Enter detailed minutes content..."></textarea>
-      </div>
-      
-      <div class="form-group">
-        <label>Related Meeting (Optional)</label>
-        <select id="minMeetingId">
-          ${meetingOptions}
-        </select>
-        <small style="color:var(--text-muted); display:block; margin-top:0.25rem;">
-          Select a meeting to associate these minutes with, or leave as "None" for general minutes.
-        </small>
-      </div>
-      
-      <div class="form-group">
-        <label>Municipality <span style="color:var(--danger);">*</span></label>
-        <select id="minMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
-      </div>
-      
-      <div class="form-group">
-        <label>Upload Supporting Documents</label>
-        <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
-             id="minutesUploadDropZone" 
-             ondrop="handleMinutesFileDrop(event)" 
-             ondragover="handleMinutesDragOver(event)"
-             ondragleave="handleMinutesDragLeave(event)"
-             onclick="document.getElementById('minutesFileInput').click()">
-          <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
-          <p style="margin:0.5rem 0; color:var(--text-muted);">
-            Drag & drop files here or click to browse
-          </p>
-          <p style="font-size:0.8rem; color:var(--text-muted);">
-            Supports: PDF, Word, Excel, PowerPoint, Images (JPG, PNG, GIF) • Max 10MB each
-          </p>
-          <input type="file" id="minutesFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleMinutesFileSelect(event)" />
+      <div style="background:var(--surface-alt); padding:0.75rem 1rem; border-radius:8px; margin-bottom:1.25rem; border-left:4px solid var(--primary);">
+        <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; color:var(--text-muted);">
+          <i class="fas fa-info-circle" style="color:var(--primary);"></i>
+          <span>Minutes must be linked to a meeting. Select the meeting these minutes belong to.</span>
         </div>
-        <div id="minutesFileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+        ${!hasMeetings ? `
+          <div style="margin-top:0.5rem; padding:0.5rem; background:rgba(245,158,11,0.1); border-radius:6px; color:var(--warning); font-size:0.85rem;">
+            <i class="fas fa-exclamation-triangle"></i> 
+            No meetings found for ${getMunicipalityLabel(currentUser.municipality)}. 
+            <a href="#" onclick="closeModal(); navigate('meetings'); return false;" style="color:var(--primary); text-decoration:underline;">
+              Schedule a meeting first
+            </a>
+          </div>
+        ` : ''}
       </div>
       
-      <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-upload"></i> Upload Minutes</button>
-    </form>
+      <form id="uploadMinutesForm" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>
+            <i class="fas fa-link" style="color:var(--primary);"></i> 
+            Related Meeting <span style="color:var(--danger);">*</span>
+          </label>
+          <select id="minMeetingId" required ${!hasMeetings ? 'disabled' : ''} 
+                  style="width:100%; padding:0.75rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:1rem; transition:all 0.3s;">
+            ${meetingOptions}
+          </select>
+          <small style="color:var(--text-muted); display:block; margin-top:0.25rem;">
+            <i class="fas fa-info-circle"></i> 
+            Select the meeting these minutes document. This links the minutes to the meeting record.
+          </small>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <i class="fas fa-heading" style="color:var(--primary);"></i> 
+            Minutes Title <span style="color:var(--danger);">*</span>
+          </label>
+          <input type="text" id="minTitle" required 
+                 placeholder="e.g., Kenol Budget Meeting Minutes - June 2026"
+                 style="width:100%; padding:0.75rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:1rem; transition:all 0.3s;" />
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <i class="fas fa-list-ul" style="color:var(--primary);"></i> 
+            Summary / Key Points
+          </label>
+          <textarea id="minSummary" rows="3" 
+                    placeholder="Enter a brief summary of key decisions and outcomes..."
+                    style="width:100%; padding:0.75rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:1rem; resize:vertical; transition:all 0.3s;"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <i class="fas fa-align-left" style="color:var(--primary);"></i> 
+            Detailed Content <span style="color:var(--danger);">*</span>
+          </label>
+          <textarea id="minContent" rows="6" required 
+                    placeholder="Enter the full minutes content including discussions, votes, and outcomes..."
+                    style="width:100%; padding:0.75rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:1rem; resize:vertical; transition:all 0.3s;"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <i class="fas fa-map-marker-alt" style="color:var(--primary);"></i> 
+            Municipality <span style="color:var(--danger);">*</span>
+          </label>
+          <select id="minMunicipality" style="width:100%; padding:0.75rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:1rem;">
+            ${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}
+          </select>
+          <small style="color:var(--text-muted); display:block; margin-top:0.25rem;">
+            <i class="fas fa-info-circle"></i> 
+            This will be auto-filled from the selected meeting.
+          </small>
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <i class="fas fa-paperclip" style="color:var(--primary);"></i> 
+            Upload Supporting Documents
+          </label>
+          <div style="border:2px dashed var(--border); border-radius:12px; padding:1.5rem; text-align:center; cursor:pointer; transition:all 0.3s;" 
+               id="minutesUploadDropZone" 
+               ondrop="handleMinutesFileDrop(event)" 
+               ondragover="handleMinutesDragOver(event)"
+               ondragleave="handleMinutesDragLeave(event)"
+               onclick="document.getElementById('minutesFileInput').click()"
+               onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface-alt)';"
+               onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface)';">
+            <i class="fas fa-cloud-upload-alt" style="font-size:2.5rem; color:var(--primary);"></i>
+            <p style="margin:0.5rem 0; color:var(--text-muted);">
+              Drag & drop files here or click to browse
+            </p>
+            <p style="font-size:0.8rem; color:var(--text-muted);">
+              Supports: PDF, Word, Excel, PowerPoint, Images (JPG, PNG, GIF) • Max 10MB each
+            </p>
+            <input type="file" id="minutesFileInput" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif" style="display:none;" onchange="handleMinutesFileSelect(event)" />
+          </div>
+          <div id="minutesFileList" style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
+        </div>
+        
+        <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex:1; padding:0.85rem; font-weight:600;">
+            <i class="fas fa-upload"></i> Upload Minutes
+          </button>
+          <button type="button" class="btn btn-outline" onclick="closeModal()" style="padding:0.85rem 1.5rem;">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </form>
+    </div>
   `);
   
+  // Auto-fill municipality from selected meeting
+  const meetingSelect = byId('minMeetingId');
+  const muniSelect = byId('minMunicipality');
+  
+  if (meetingSelect && muniSelect) {
+    meetingSelect.addEventListener('change', function() {
+      const selectedId = parseInt(this.value);
+      if (selectedId) {
+        const meeting = allowedMeetings.find(m => m.id === selectedId);
+        if (meeting && meeting.municipality) {
+          muniSelect.value = meeting.municipality;
+          // Auto-fill title if empty
+          const titleInput = byId('minTitle');
+          if (titleInput && !titleInput.value.trim()) {
+            const meetingDate = formatDate(meeting.date);
+            titleInput.value = `${meeting.title} - Minutes (${meetingDate})`;
+          }
+        }
+      }
+    });
+    
+    // If there's only one meeting, auto-select it
+    if (allowedMeetings.length === 1) {
+      meetingSelect.value = allowedMeetings[0].id;
+      meetingSelect.dispatchEvent(new Event('change'));
+    }
+  }
+  
+  // Handle form submission with validation
   byId('uploadMinutesForm').addEventListener('submit', async function (event) {
     event.preventDefault();
+    
+    const meetingId = byId('minMeetingId').value;
     const title = byId('minTitle').value.trim();
     const summary = byId('minSummary').value.trim();
     const content = byId('minContent').value.trim();
-    const meetingId = byId('minMeetingId').value ? parseInt(byId('minMeetingId').value) : null;
     const municipality = byId('minMunicipality').value;
     
-    if (!title || !content) { 
-      toast('Please fill in title and content', 'danger'); 
-      return; 
+    // Validate required fields
+    if (!meetingId) {
+      toast('Please select a meeting for these minutes', 'danger');
+      byId('minMeetingId').style.borderColor = 'var(--danger)';
+      byId('minMeetingId').focus();
+      return;
     }
     
+    if (!title) {
+      toast('Please enter a title for the minutes', 'danger');
+      byId('minTitle').style.borderColor = 'var(--danger)';
+      byId('minTitle').focus();
+      return;
+    }
+    
+    if (!content) {
+      toast('Please enter the minutes content', 'danger');
+      byId('minContent').style.borderColor = 'var(--danger)';
+      byId('minContent').focus();
+      return;
+    }
+    
+    if (!municipality) {
+      toast('Please select a municipality', 'danger');
+      byId('minMunicipality').style.borderColor = 'var(--danger)';
+      byId('minMunicipality').focus();
+      return;
+    }
+    
+    // Reset border colors
+    byId('minMeetingId').style.borderColor = 'var(--border)';
+    byId('minTitle').style.borderColor = 'var(--border)';
+    byId('minContent').style.borderColor = 'var(--border)';
+    byId('minMunicipality').style.borderColor = 'var(--border)';
+    
+    // Get meeting details for reference (stored in a note, not as a model field)
+    const selectedMeeting = allowedMeetings.find(m => m.id === parseInt(meetingId));
+    const meetingTitle = selectedMeeting ? selectedMeeting.title : 'Unknown Meeting';
+    
+    // Create note with meeting info for reference
+    let fullContent = content;
+    if (selectedMeeting) {
+      // Add meeting reference at the top of content
+      const meetingRef = `\n\n--- Meeting Reference ---\nMeeting: ${selectedMeeting.title}\nDate: ${selectedMeeting.date} ${selectedMeeting.time}\nLocation: ${selectedMeeting.location}\n---\n\n`;
+      fullContent = meetingRef + content;
+    }
+    
+    // Prepare data - only use fields that exist in the Minute model
     const minuteData = { 
-      title,
-      summary,
-      content,
-      meetingId,
+      title: title,
+      summary: summary || '',  // Empty string if not provided
+      content: fullContent,     // Content with meeting reference
+      meetingId: parseInt(meetingId),
       uploadedBy: currentUser.name,
-      municipality,
+      municipality: municipality,
       uploadDate: new Date().toISOString().slice(0, 10),
-      files: uploadedMinutesFiles
+      files: uploadedMinutesFiles || []
     };
     
-    const newMinute = await DB.addMinute(minuteData);
-    if (newMinute) {
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+    submitBtn.disabled = true;
+    
+    try {
+      const newMinute = await DB.addMinute(minuteData);
+      
+      if (newMinute) {
         closeModal();
-        toast('Minutes uploaded successfully with ' + uploadedMinutesFiles.length + ' file(s) attached ✅', 'success');
+        const fileCount = uploadedMinutesFiles.length;
+        const meetingInfo = selectedMeeting ? ` to "${meetingTitle}"` : '';
+        toast(`Minutes "${title}" uploaded successfully ✅${meetingInfo} ${fileCount > 0 ? `with ${fileCount} file(s) attached` : ''}`, 'success');
         navigate('minutes');
-    } else {
-        toast('Failed to upload minutes', 'danger');
+      } else {
+        toast('Failed to upload minutes. Please try again.', 'danger');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast('An error occurred while uploading minutes: ' + (error.message || 'Unknown error'), 'danger');
+    } finally {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
     }
   });
 }
@@ -2766,29 +2960,40 @@ async function renderMinutes() {
       const hasFiles = item.files && item.files.length > 0;
       const images = hasFiles ? item.files.filter(f => f.type && f.type.startsWith('image/')) : [];
       
+      // Get meeting details if linked
+      const hasMeeting = item.meetingId && item.meetingId > 0;
+      
       return `
-      <div class="card">
+      <div class="card" style="${hasMeeting ? 'border-left:4px solid var(--primary);' : ''}">
         <div class="flex-between" style="display:flex;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
-          <strong style="font-size:1.05rem;">${item.title || 'Untitled Minutes'}</strong>
+          <div>
+            <strong style="font-size:1.05rem;">${item.title || 'Untitled Minutes'}</strong>
+            ${hasMeeting ? `
+              <div style="font-size:0.85rem; color:var(--primary); margin-top:0.2rem;">
+                <i class="fas fa-link"></i> 
+                <span style="font-weight:500;">Meeting #${item.meetingId}</span>
+                ${item.meetingTitle ? `- ${item.meetingTitle}` : ''}
+              </div>
+            ` : ''}
+          </div>
           <span style="color:var(--text-muted); font-size:0.85rem;">
             <i class="fas fa-calendar-day"></i> ${formatDate(item.uploadDate)}
           </span>
         </div>
-        ${item.meetingId ? `
-          <div style="font-size:0.85rem; color:var(--text-muted); margin:0.25rem 0;">
-            <i class="fas fa-link"></i> Meeting #${item.meetingId}
-          </div>
-        ` : ''}
+        
         ${item.summary ? `
           <div style="margin:0.5rem 0; padding:0.5rem; background:var(--surface-alt); border-radius:8px; border-left:3px solid var(--primary); font-size:0.95rem;">
-            <strong>Summary:</strong> ${item.summary}
+            <strong>📝 Summary:</strong> ${item.summary}
           </div>
         ` : ''}
-        <p style="margin-top:0.85rem;">${item.content}</p>
+        
+        <p style="margin-top:0.85rem; white-space:pre-wrap;">${item.content}</p>
+        
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem;">
           <div style="color:var(--text-muted);font-size:0.95rem;">
             <i class="fas fa-user"></i> ${item.uploadedBy} • 
             <i class="fas fa-map-marker-alt"></i> ${getMunicipalityLabel(item.municipality)}
+            ${hasMeeting ? ` • <i class="fas fa-calendar-check" style="color:var(--primary);"></i> Linked to Meeting` : ''}
           </div>
           ${hasFiles ? `
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
@@ -2805,9 +3010,15 @@ async function renderMinutes() {
             </div>
           ` : ''}
         </div>
+        
         ${canAdd ? `
           <div style="margin-top:0.75rem; display:flex; gap:0.5rem;">
-            <button class="btn btn-danger btn-sm" onclick="deleteMinute(${item.id})">
+            ${hasMeeting ? `
+              <button class="btn btn-info btn-sm" onclick="viewMeetingFromMinutes(${item.meetingId})" style="background:#2563eb;color:white;border:none;padding:0.4rem 0.8rem;border-radius:999px;font-size:0.75rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;">
+                <i class="fas fa-eye"></i> View Meeting
+              </button>
+            ` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deleteMinute(${item.id})" style="background:#dc2626;color:white;border:none;padding:0.4rem 0.8rem;border-radius:999px;font-size:0.75rem;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;">
               <i class="fas fa-trash"></i> Delete
             </button>
           </div>
@@ -2815,6 +3026,34 @@ async function renderMinutes() {
       </div>
     `}).join('') : '<div class="card text-center text-muted">No minutes uploaded yet.</div>'}
   `);
+}
+
+async function viewMeetingFromMinutes(meetingId) {
+  if (!meetingId) {
+    toast('No meeting linked to these minutes', 'info');
+    return;
+  }
+  
+  // Navigate to meetings and highlight the specific meeting
+  navigate('meetings');
+  
+  // Scroll to the meeting card after a short delay
+  setTimeout(() => {
+    const meetingCards = document.querySelectorAll('.card');
+    for (const card of meetingCards) {
+      if (card.textContent.includes(`Meeting #${meetingId}`) || 
+          card.querySelector(`[onclick*="${meetingId}"]`)) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.border = '3px solid var(--primary)';
+        card.style.boxShadow = '0 0 20px rgba(46,125,50,0.3)';
+        setTimeout(() => {
+          card.style.border = '';
+          card.style.boxShadow = '';
+        }, 3000);
+        break;
+      }
+    }
+  }, 500);
 }
 
 async function viewMinutesFiles(id) {
@@ -6167,6 +6406,1379 @@ async function loadAuditLogs() {
       </tr>
     `;
   }
+}
+
+
+// ============ MEETING ATTENDANCE (PHYSICAL) ============
+
+async function recordPhysicalAttendance(meetingId) {
+    try {
+        const location = await getCurrentLocation();
+        
+        const attendanceData = {
+            meeting_id: meetingId,
+            user_id: currentUser.id,
+            user_name: currentUser.name,
+            user_email: currentUser.email,
+            check_in_method: 'manual',
+            location_lat: location ? location.lat : null,
+            location_lng: location ? location.lng : null,
+            location_accuracy: location ? location.accuracy : null,
+            is_verified: true,
+            verified_by: currentUser.name,
+            notes: 'Physical attendance recorded via mobile/desktop'
+        };
+        
+        const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(attendanceData)
+        });
+        
+        if (response.ok) {
+            toast('Physical attendance recorded successfully ✅', 'success');
+            await renderMeetings();
+            return true;
+        } else {
+            const error = await response.json();
+            toast(error.error || 'Failed to record attendance', 'danger');
+            return false;
+        }
+    } catch (error) {
+        toast('Error recording attendance: ' + error.message, 'danger');
+        return false;
+    }
+}
+
+async function viewPhysicalAttendance(meetingId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance`);
+        const attendance = await response.json();
+        
+        if (!attendance || attendance.length === 0) {
+            toast('No physical attendance records found', 'info');
+            return;
+        }
+        
+        showModal(`
+            <h3><i class="fas fa-clipboard-list"></i> Physical Attendance - ${attendance.length} records</h3>
+            <div style="overflow-x:auto; max-height:400px; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:var(--surface-alt);">
+                            <th style="padding:0.5rem; text-align:left;">#</th>
+                            <th style="padding:0.5rem; text-align:left;">Name</th>
+                            <th style="padding:0.5rem; text-align:left;">Email</th>
+                            <th style="padding:0.5rem; text-align:left;">Time</th>
+                            <th style="padding:0.5rem; text-align:left;">Method</th>
+                            <th style="padding:0.5rem; text-align:left;">Verified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${attendance.map((a, i) => `
+                            <tr style="border-bottom:1px solid var(--border);">
+                                <td style="padding:0.5rem;">${i + 1}</td>
+                                <td style="padding:0.5rem;"><strong>${a.user_name}</strong></td>
+                                <td style="padding:0.5rem;">${a.user_email}</td>
+                                <td style="padding:0.5rem;">${formatDate(a.check_in_time)} ${a.check_in_time ? new Date(a.check_in_time).toLocaleTimeString() : ''}</td>
+                                <td style="padding:0.5rem;"><span class="badge badge-info">${a.check_in_method}</span></td>
+                                <td style="padding:0.5rem;">${a.is_verified ? '✅' : '⏳'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top:1rem; display:flex; gap:0.5rem;">
+                <button class="btn btn-success btn-sm" onclick="exportAttendanceCSV(${meetingId})">
+                    <i class="fas fa-file-csv"></i> Export CSV
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="closeModal()">Close</button>
+            </div>
+        `);
+    } catch (error) {
+        toast('Error loading attendance records', 'danger');
+    }
+}
+
+async function exportAttendanceCSV(meetingId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance`);
+        const attendance = await response.json();
+        
+        if (!attendance || attendance.length === 0) {
+            toast('No attendance records to export', 'warning');
+            return;
+        }
+        
+        let csv = 'Name,Email,Check-in Time,Method,Verified\n';
+        attendance.forEach(a => {
+            const time = a.check_in_time ? new Date(a.check_in_time).toLocaleString() : '';
+            csv += `"${a.user_name}","${a.user_email}","${time}","${a.check_in_method}","${a.is_verified ? 'Yes' : 'No'}"\n`;
+        });
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `attendance_${meetingId}_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        
+        toast('Attendance exported successfully ✅', 'success');
+    } catch (error) {
+        toast('Error exporting attendance', 'danger');
+    }
+}
+
+async function bulkAttendanceModal(meetingId) {
+  const users = await DB.users();
+  const members = await DB.members();
+  const allUsers = [...users, ...members];
+  const uniqueUsers = allUsers.filter((u, i, arr) => 
+    arr.findIndex(x => x.email === u.email) === i
+  );
+  
+  const usersByMuni = uniqueUsers.filter(u => 
+    u.municipality === currentUser.municipality || currentUser.role === 'super_admin'
+  );
+  
+  // Get meeting details
+  const meetings = await DB.meetings();
+  const meeting = meetings.find(m => m.id === meetingId);
+  
+  // Get existing attendance records
+  let existingAttendance = [];
+  let checkedInEmails = new Set();
+  try {
+    const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance`);
+    if (response.ok) {
+      existingAttendance = await response.json();
+      checkedInEmails = new Set(existingAttendance.map(a => a.user_email));
+    }
+  } catch (e) {
+    console.warn('Could not fetch existing attendance:', e);
+  }
+  
+  // Build HTML with numbered rows and clickable rows
+  const attendeeListHtml = usersByMuni.length ? usersByMuni.map((u, index) => {
+    const isCheckedIn = checkedInEmails.has(u.email);
+    const rowNumber = index + 1;
+    return `
+      <div class="attendee-item-wrapper" data-name="${u.name.toLowerCase()}" data-email="${u.email.toLowerCase()}" 
+           data-index="${rowNumber}"
+           style="
+             display:flex; 
+             align-items:center; 
+             gap:0.6rem; 
+             padding:0.3rem 0.5rem; 
+             cursor:pointer; 
+             border-radius:6px;
+             transition:all 0.15s;
+             border-bottom:1px solid var(--border);
+             ${isCheckedIn ? 'background:rgba(34,197,94,0.08); border-left:3px solid #22c55e;' : 'border-left:3px solid transparent;'}
+           " 
+           onmouseover="this.style.background='${isCheckedIn ? 'rgba(34,197,94,0.15)' : 'var(--surface-alt)'}'" 
+           onmouseout="this.style.background='${isCheckedIn ? 'rgba(34,197,94,0.08)' : 'transparent'}'"
+           onclick="toggleAttendee(this)">
+        
+        <!-- Row Number -->
+        <span style="
+          font-size:0.65rem; 
+          color:var(--text-muted); 
+          font-weight:600; 
+          min-width:22px; 
+          text-align:center; 
+          flex-shrink:0;
+          background:var(--surface-alt);
+          padding:0.05rem 0.2rem;
+          border-radius:4px;
+        ">${rowNumber}</span>
+        
+        <!-- Status Indicator (Dot) -->
+        <span style="
+          width:10px; 
+          height:10px; 
+          border-radius:50%; 
+          flex-shrink:0;
+          ${isCheckedIn ? 'background:#22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4);' : 'background:var(--border);'}
+          transition:all 0.3s;
+        " id="statusDot_${u.id}"></span>
+        
+        <!-- User Info -->
+        <span style="display:flex; flex-direction:column; flex:1; min-width:0;">
+          <span style="font-weight:500; font-size:0.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:0.4rem;">
+            ${u.name}
+            ${isCheckedIn ? '<span style="font-size:0.5rem; color:#22c55e; font-weight:600;">✓</span>' : ''}
+          </span>
+          <span style="font-size:0.65rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${u.email}</span>
+        </span>
+        
+        <!-- Role Badge -->
+        <span style="font-size:0.5rem; color:var(--text-muted); background:var(--surface-alt); padding:0.05rem 0.5rem; border-radius:12px; flex-shrink:0; border:1px solid var(--border);">
+          ${getRoleLabel(u.role)}
+        </span>
+        
+        <!-- Status Badge -->
+        ${isCheckedIn ? `
+          <span style="font-size:0.5rem; color:#22c55e; background:rgba(34,197,94,0.12); padding:0.05rem 0.4rem; border-radius:12px; flex-shrink:0; border:1px solid rgba(34,197,94,0.2); font-weight:600;">
+            ✓ Present
+          </span>
+        ` : `
+          <span style="font-size:0.5rem; color:var(--text-muted); background:var(--surface-alt); padding:0.05rem 0.4rem; border-radius:12px; flex-shrink:0; border:1px dashed var(--border);">
+            Not marked
+          </span>
+        `}
+        
+        <!-- Hidden checkbox (for form submission) -->
+        <input type="checkbox" name="attendee" value="${u.id}" data-name="${u.name}" data-email="${u.email}" 
+               ${isCheckedIn ? 'checked' : ''}
+               style="display:none;" />
+      </div>
+    `;
+  }).join('') : `
+    <div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">
+      <i class="fas fa-users" style="font-size:2rem; display:block; margin-bottom:0.5rem; color:var(--text-muted);"></i>
+      No users available for ${getMunicipalityLabel(currentUser.municipality)}
+    </div>
+  `;
+
+  showModal(`
+    <div style="max-height:80vh; overflow-y:auto; padding-right:0.5rem;">
+      <!-- Header -->
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.25rem;">
+        <i class="fas fa-users" style="font-size:1.5rem; color:var(--primary);"></i>
+        <h3 style="margin:0;">Bulk Attendance Entry</h3>
+        <span style="font-size:0.7rem; color:var(--text-muted); background:var(--surface-alt); padding:0.1rem 0.6rem; border-radius:12px; margin-left:auto;">
+          <span id="totalUsers">${usersByMuni.length}</span> attendees
+        </span>
+      </div>
+      
+      <!-- Meeting Info -->
+      ${meeting ? `
+        <div style="background:var(--surface-alt); padding:0.5rem 0.75rem; border-radius:8px; margin-bottom:0.75rem; font-size:0.9rem; border-left:3px solid var(--primary);">
+          <strong>Meeting:</strong> ${meeting.title} 
+          <span style="color:var(--text-muted);">• ${formatDate(meeting.date)} at ${meeting.time}</span>
+          <span style="margin-left:0.5rem; font-size:0.8rem; color:var(--text-muted);">
+            (${existingAttendance.length} already checked in)
+          </span>
+        </div>
+      ` : ''}
+      
+      <!-- Info Banner -->
+      ${existingAttendance.length > 0 ? `
+        <div style="background:rgba(34,197,94,0.08); padding:0.4rem 0.75rem; border-radius:6px; margin-bottom:0.75rem; border-left:3px solid #22c55e;">
+          <span style="font-size:0.8rem; color:var(--text-muted);">
+            <i class="fas fa-check-circle" style="color:#22c55e;"></i> 
+            <strong style="color:#22c55e;">${existingAttendance.length}</strong> users are already marked as present. 
+            <span style="color:var(--text-muted);">Click on a row to toggle attendance.</span>
+          </span>
+        </div>
+      ` : `
+        <div style="background:rgba(245,158,11,0.08); padding:0.4rem 0.75rem; border-radius:6px; margin-bottom:0.75rem; border-left:3px solid #f59e0b;">
+          <span style="font-size:0.8rem; color:var(--text-muted);">
+            <i class="fas fa-info-circle" style="color:#f59e0b;"></i> 
+            No one has checked in yet. <strong>Click on a row</strong> to mark them as present.
+          </span>
+        </div>
+      `}
+      
+      <form id="bulkAttendanceForm">
+        <!-- Attendee List -->
+        <div class="form-group" style="margin-bottom:0.5rem;">
+          <label style="font-size:0.85rem; font-weight:600; display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+            <span><i class="fas fa-user-check" style="color:var(--primary);"></i> Attendees</span>
+            <span style="font-weight:400; color:var(--text-muted); font-size:0.75rem;">
+              <span style="color:#22c55e; font-weight:600;" id="checkedInCount">${existingAttendance.length}</span> marked present
+            </span>
+          </label>
+          
+          <!-- Search Input -->
+          <div style="margin-bottom:0.4rem; position:relative;">
+            <input type="text" id="attendeeSearch" placeholder="🔍 Search by name or email..." 
+                   style="width:100%; padding:0.35rem 0.7rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.85rem; background:var(--surface); color:var(--text); transition:border 0.3s;"
+                   oninput="filterAttendeeList(this.value)" />
+          </div>
+          
+          <!-- Attendee List Container -->
+          <div id="attendeeListContainer" style="
+            max-height:320px; 
+            overflow-y:auto; 
+            border:1.5px solid var(--border); 
+            border-radius:8px; 
+            padding:0.3rem;
+            background:var(--surface);
+          ">
+            ${attendeeListHtml}
+          </div>
+        </div>
+        
+        <!-- Selection Controls -->
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.5rem; align-items:center; padding:0.3rem 0.2rem;">
+          <button type="button" class="btn btn-sm btn-outline" onclick="selectAllAttendees()" style="font-size:0.7rem; padding:0.15rem 0.6rem; border-radius:999px;">
+            <i class="fas fa-check-double"></i> All
+          </button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="deselectAllAttendees()" style="font-size:0.7rem; padding:0.15rem 0.6rem; border-radius:999px;">
+            <i class="fas fa-times"></i> None
+          </button>
+          ${existingAttendance.length > 0 ? `
+            <button type="button" class="btn btn-sm btn-outline" onclick="selectCheckedIn()" style="font-size:0.7rem; padding:0.15rem 0.6rem; border-radius:999px; border-color:#22c55e; color:#22c55e;">
+              <i class="fas fa-check" style="color:#22c55e;"></i> Present (${existingAttendance.length})
+            </button>
+          ` : ''}
+          <span style="font-size:0.7rem; color:var(--text-muted); margin-left:auto; background:var(--surface-alt); padding:0.1rem 0.6rem; border-radius:12px;">
+            <span id="selectedDisplay">Selected: <strong id="selectedCountNum">0</strong></span>
+          </span>
+        </div>
+        
+        <!-- Notes -->
+        <div class="form-group" style="margin-bottom:0.5rem;">
+          <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+            <i class="fas fa-sticky-note" style="color:var(--primary);"></i> Notes (Optional)
+          </label>
+          <textarea id="bulkNotes" rows="2" placeholder="Add notes about this attendance session..."
+                    style="width:100%; padding:0.4rem 0.6rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.82rem; background:var(--surface); color:var(--text); resize:vertical; transition:border 0.3s;"
+                    onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem; border-top:1px solid var(--border); padding-top:0.6rem;">
+          <button type="submit" class="btn btn-primary" style="flex:1; padding:0.4rem 1rem; font-size:0.85rem; font-weight:600; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; gap:0.3rem;">
+            <i class="fas fa-save"></i> Record Attendance
+          </button>
+          <button type="button" class="btn btn-outline" onclick="closeModal()" style="padding:0.4rem 1rem; font-size:0.85rem; border-radius:999px; display:inline-flex; align-items:center; gap:0.3rem;">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  `);
+  
+  // --- JavaScript functions for the modal ---
+  
+  // Update selected count
+  const updateSelectedCount = () => {
+    const checked = document.querySelectorAll('input[name="attendee"]:checked').length;
+    const countNum = document.getElementById('selectedCountNum');
+    if (countNum) countNum.textContent = checked;
+    
+    // Also update the display
+    const selectedDisplay = document.getElementById('selectedDisplay');
+    if (selectedDisplay) {
+      selectedDisplay.innerHTML = `Selected: <strong id="selectedCountNum">${checked}</strong>`;
+    }
+  };
+  
+  // Toggle attendee checkbox when clicking the row
+  window.toggleAttendee = function(element) {
+    const checkbox = element.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+      checkbox.checked = !checkbox.checked;
+      // Trigger change event
+      const event = new Event('change', { bubbles: true });
+      checkbox.dispatchEvent(event);
+      handleCheckboxChange(checkbox);
+    }
+  };
+  
+  // Handle checkbox change - update visual state
+  window.handleCheckboxChange = function(checkbox) {
+    const wrapper = checkbox.closest('.attendee-item-wrapper');
+    if (wrapper) {
+      const isChecked = checkbox.checked;
+      const statusBadge = wrapper.querySelectorAll('span');
+      const dot = wrapper.querySelector('[id^="statusDot_"]');
+      
+      if (isChecked) {
+        wrapper.style.background = 'rgba(34,197,94,0.12)';
+        wrapper.style.borderLeft = '3px solid #22c55e';
+        if (dot) {
+          dot.style.background = '#22c55e';
+          dot.style.boxShadow = '0 0 8px rgba(34,197,94,0.5)';
+        }
+        // Update status badge
+        statusBadge.forEach(span => {
+          if (span.textContent.includes('Not marked')) {
+            span.innerHTML = '✓ Present';
+            span.style.color = '#22c55e';
+            span.style.background = 'rgba(34,197,94,0.12)';
+            span.style.border = '1px solid rgba(34,197,94,0.2)';
+            span.style.fontWeight = '600';
+          }
+        });
+        // Update name span
+        const nameSpan = wrapper.querySelector('span span:first-child');
+        if (nameSpan && !nameSpan.textContent.includes('✓')) {
+          nameSpan.innerHTML = nameSpan.textContent + ' <span style="font-size:0.5rem; color:#22c55e; font-weight:600;">✓</span>';
+        }
+      } else {
+        wrapper.style.background = 'transparent';
+        wrapper.style.borderLeft = '3px solid transparent';
+        if (dot) {
+          dot.style.background = 'var(--border)';
+          dot.style.boxShadow = 'none';
+        }
+        // Update status badge
+        statusBadge.forEach(span => {
+          if (span.textContent.includes('✓ Present')) {
+            span.innerHTML = 'Not marked';
+            span.style.color = 'var(--text-muted)';
+            span.style.background = 'var(--surface-alt)';
+            span.style.border = '1px dashed var(--border)';
+            span.style.fontWeight = 'normal';
+          }
+        });
+        // Remove ✓ from name
+        const nameSpan = wrapper.querySelector('span span:first-child');
+        if (nameSpan) {
+          const text = nameSpan.textContent.replace('✓', '').trim();
+          nameSpan.innerHTML = text;
+        }
+      }
+      
+      // Update hover effects
+      wrapper.onmouseover = function() {
+        this.style.background = isChecked ? 'rgba(34,197,94,0.2)' : 'var(--surface-alt)';
+      };
+      wrapper.onmouseout = function() {
+        this.style.background = isChecked ? 'rgba(34,197,94,0.12)' : 'transparent';
+      };
+    }
+    updateSelectedCount();
+  };
+  
+  // Add event listeners to checkboxes
+  document.querySelectorAll('input[name="attendee"]').forEach(cb => {
+    cb.addEventListener('change', function() {
+      handleCheckboxChange(this);
+      updateSelectedCount();
+    });
+  });
+  
+  // Initial count
+  setTimeout(updateSelectedCount, 100);
+  
+  // Filter function for search
+  window.filterAttendeeList = function(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    const wrappers = document.querySelectorAll('.attendee-item-wrapper');
+    let visibleCount = 0;
+    wrappers.forEach(wrapper => {
+      const name = wrapper.dataset.name || '';
+      const email = wrapper.dataset.email || '';
+      if (!term || name.includes(term) || email.includes(term)) {
+        wrapper.style.display = 'flex';
+        visibleCount++;
+      } else {
+        wrapper.style.display = 'none';
+      }
+    });
+    const container = document.getElementById('attendeeListContainer');
+    const emptyMsg = container.querySelector('.no-results');
+    if (visibleCount === 0 && term) {
+      if (!emptyMsg) {
+        const msg = document.createElement('div');
+        msg.className = 'no-results';
+        msg.style.textAlign = 'center';
+        msg.style.padding = '1rem';
+        msg.style.color = 'var(--text-muted)';
+        msg.style.fontSize = '0.85rem';
+        msg.innerHTML = '🔍 No attendees match your search';
+        container.appendChild(msg);
+      }
+    } else if (emptyMsg) {
+      emptyMsg.remove();
+    }
+  };
+  
+  window.selectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => {
+      cb.checked = true;
+      handleCheckboxChange(cb);
+    });
+    updateSelectedCount();
+  };
+  
+  window.deselectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => {
+      cb.checked = false;
+      handleCheckboxChange(cb);
+    });
+    updateSelectedCount();
+  };
+  
+  window.selectCheckedIn = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => {
+      const email = cb.dataset.email;
+      if (checkedInEmails.has(email)) {
+        cb.checked = true;
+        handleCheckboxChange(cb);
+      }
+    });
+    updateSelectedCount();
+  };
+  
+  // Form submission
+  byId('bulkAttendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const checkboxes = document.querySelectorAll('input[name="attendee"]:checked');
+    const attendees = Array.from(checkboxes).map(cb => ({
+      user_id: parseInt(cb.value),
+      user_name: cb.dataset.name,
+      user_email: cb.dataset.email
+    }));
+    
+    const unselected = document.querySelectorAll('input[name="attendee"]:not(:checked)');
+    const removeAttendees = Array.from(unselected)
+      .filter(cb => checkedInEmails.has(cb.dataset.email))
+      .map(cb => ({
+        user_id: parseInt(cb.value),
+        user_email: cb.dataset.email
+      }));
+    
+    if (attendees.length === 0 && removeAttendees.length === 0) {
+      toast('No changes to record', 'info');
+      return;
+    }
+    
+    const notes = byId('bulkNotes').value.trim();
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recording...';
+    submitBtn.disabled = true;
+    
+    try {
+      // Record new attendees
+      if (attendees.length > 0) {
+        const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance/bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            attendees: attendees,
+            verified_by: currentUser.name,
+            notes: notes || 'Bulk attendance entry'
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to record attendance');
+        }
+      }
+      
+      // Remove unchecked attendees
+      if (removeAttendees.length > 0) {
+        for (const attendee of removeAttendees) {
+          try {
+            await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance/${attendee.user_id}`, {
+              method: 'DELETE'
+            });
+          } catch (e) {
+            console.warn(`Could not remove attendance for ${attendee.user_id}:`, e);
+          }
+        }
+      }
+      
+      closeModal();
+      const added = attendees.length;
+      const removed = removeAttendees.length;
+      let message = '';
+      if (added > 0 && removed > 0) {
+        message = `✅ ${added} added, ${removed} removed`;
+      } else if (added > 0) {
+        message = `✅ ${added} attendees marked present`;
+      } else if (removed > 0) {
+        message = `✅ ${removed} attendees removed`;
+      }
+      toast(message, 'success');
+      await renderMeetings();
+      
+    } catch (error) {
+      toast(error.message || 'Error recording attendance', 'danger');
+    } finally {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+  });
+}
+  
+  // Filter function for search
+  window.filterAttendeeList = function(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    const items = document.querySelectorAll('.attendee-item');
+    let visibleCount = 0;
+    items.forEach(item => {
+      const name = item.dataset.name || '';
+      const email = item.dataset.email || '';
+      if (!term || name.includes(term) || email.includes(term)) {
+        item.style.display = 'flex';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    const container = document.getElementById('attendeeListContainer');
+    const emptyMsg = container.querySelector('.no-results');
+    if (visibleCount === 0 && term) {
+      if (!emptyMsg) {
+        const msg = document.createElement('div');
+        msg.className = 'no-results';
+        msg.style.textAlign = 'center';
+        msg.style.padding = '1rem';
+        msg.style.color = 'var(--text-muted)';
+        msg.style.fontSize = '0.85rem';
+        msg.innerHTML = '🔍 No attendees match your search';
+        container.appendChild(msg);
+      }
+    } else if (emptyMsg) {
+      emptyMsg.remove();
+    }
+  };
+  
+  window.selectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => cb.checked = true);
+    updateSelectedCount();
+  };
+  
+  window.deselectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => cb.checked = false);
+    updateSelectedCount();
+  };
+  
+  window.selectCheckedIn = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => {
+      // Check if this user is already checked in
+      const email = cb.dataset.email;
+      if (checkedInEmails.has(email)) {
+        cb.checked = true;
+      }
+    });
+    updateSelectedCount();
+  };
+  
+  byId('bulkAttendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Get selected checkboxes
+    const checkboxes = document.querySelectorAll('input[name="attendee"]:checked');
+    const attendees = Array.from(checkboxes).map(cb => ({
+      user_id: parseInt(cb.value),
+      user_name: cb.dataset.name,
+      user_email: cb.dataset.email
+    }));
+    
+    // Get unselected checkboxes (to remove attendance)
+    const unselected = document.querySelectorAll('input[name="attendee"]:not(:checked)');
+    const removeAttendees = Array.from(unselected)
+      .filter(cb => checkedInEmails.has(cb.dataset.email))
+      .map(cb => ({
+        user_id: parseInt(cb.value),
+        user_email: cb.dataset.email
+      }));
+    
+    if (attendees.length === 0 && removeAttendees.length === 0) {
+      toast('No changes to record', 'info');
+      return;
+    }
+    
+    const notes = byId('bulkNotes').value.trim();
+    
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recording...';
+    submitBtn.disabled = true;
+    
+    try {
+      // Record new attendees
+      if (attendees.length > 0) {
+        const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance/bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            attendees: attendees,
+            verified_by: currentUser.name,
+            notes: notes || 'Bulk attendance entry'
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to record attendance');
+        }
+      }
+      
+      // Remove unchecked attendees (if any)
+      if (removeAttendees.length > 0) {
+        for (const attendee of removeAttendees) {
+          try {
+            await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance/${attendee.user_id}`, {
+              method: 'DELETE'
+            });
+          } catch (e) {
+            console.warn(`Could not remove attendance for ${attendee.user_id}:`, e);
+          }
+        }
+      }
+      
+      closeModal();
+      const added = attendees.length;
+      const removed = removeAttendees.length;
+      let message = '';
+      if (added > 0 && removed > 0) {
+        message = `✅ ${added} added, ${removed} removed`;
+      } else if (added > 0) {
+        message = `✅ ${added} attendees recorded`;
+      } else if (removed > 0) {
+        message = `✅ ${removed} attendees removed`;
+      }
+      toast(message, 'success');
+      await renderMeetings();
+      
+    } catch (error) {
+      toast(error.message || 'Error recording attendance', 'danger');
+    } finally {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+  });
+
+  
+  // Filter function for search
+  window.filterAttendeeList = function(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    const items = document.querySelectorAll('.attendee-item');
+    let visibleCount = 0;
+    items.forEach(item => {
+      const name = item.dataset.name || '';
+      const email = item.dataset.email || '';
+      if (!term || name.includes(term) || email.includes(term)) {
+        item.style.display = 'flex';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    // Show/hide empty state
+    const container = document.getElementById('attendeeListContainer');
+    const emptyMsg = container.querySelector('.no-results');
+    if (visibleCount === 0 && term) {
+      if (!emptyMsg) {
+        const msg = document.createElement('div');
+        msg.className = 'no-results';
+        msg.style.textAlign = 'center';
+        msg.style.padding = '1rem';
+        msg.style.color = 'var(--text-muted)';
+        msg.style.fontSize = '0.85rem';
+        msg.innerHTML = '🔍 No attendees match your search';
+        container.appendChild(msg);
+      }
+    } else if (emptyMsg) {
+      emptyMsg.remove();
+    }
+  };
+  
+  window.selectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => cb.checked = true);
+    updateSelectedCount();
+  };
+  
+  window.deselectAllAttendees = function() {
+    document.querySelectorAll('input[name="attendee"]').forEach(cb => cb.checked = false);
+    updateSelectedCount();
+  };
+  
+  byId('bulkAttendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const checkboxes = document.querySelectorAll('input[name="attendee"]:checked');
+    const attendees = Array.from(checkboxes).map(cb => ({
+      user_id: parseInt(cb.value),
+      user_name: cb.dataset.name,
+      user_email: cb.dataset.email
+    }));
+    
+    if (attendees.length === 0) {
+      toast('Please select at least one attendee', 'danger');
+      return;
+    }
+    
+    const notes = byId('bulkNotes').value.trim();
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}/attendance/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendees: attendees,
+          verified_by: currentUser.name,
+          notes: notes
+        })
+      });
+      
+      if (response.ok) {
+        closeModal();
+        toast(`${attendees.length} attendees recorded ✅`, 'success');
+        await renderMeetings();
+      } else {
+        const error = await response.json();
+        toast(error.error || 'Failed to record attendance', 'danger');
+      }
+    } catch (error) {
+      toast('Error recording attendance', 'danger');
+    }
+  });
+
+
+// ============ PROJECT MANAGEMENT ============
+
+async function renderProjects() {
+    const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+    const municipality = currentUser.municipality === 'all' ? '' : currentUser.municipality;
+    
+    try {
+        const url = `${API_BASE_URL}/projects${municipality ? '?municipality=' + municipality : ''}`;
+        const response = await fetch(url);
+        const projects = await response.json();
+        
+        // Get stats
+        const statsResponse = await fetch(`${API_BASE_URL}/projects/dashboard-stats${municipality ? '?municipality=' + municipality : ''}`);
+        const stats = await statsResponse.json();
+        
+        render(`
+            <div class="page-header">
+                <h2><i class="fas fa-project-diagram"></i> Municipal Projects</h2>
+                ${canManage ? '<button class="btn btn-primary btn-sm" onclick="showCreateProjectModal()"><i class="fas fa-plus"></i> New Project</button>' : ''}
+            </div>
+            
+            <!-- Project Stats -->
+            <div class="grid-4" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:0.75rem; margin-bottom:1.5rem;">
+                <div class="stat-card" style="border-left-color:#2563eb;">
+                    <div class="num">${stats.total}</div>
+                    <div class="label">Total Projects</div>
+                </div>
+                <div class="stat-card" style="border-left-color:#22c55e;">
+                    <div class="num">${stats.active}</div>
+                    <div class="label">Active</div>
+                </div>
+                <div class="stat-card" style="border-left-color:#f59e0b;">
+                    <div class="num">${stats.planning}</div>
+                    <div class="label">Planning</div>
+                </div>
+                <div class="stat-card" style="border-left-color:#3b82f6;">
+                    <div class="num">${stats.completed}</div>
+                    <div class="label">Completed</div>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <button class="btn btn-sm btn-outline" onclick="filterProjects('all')">All</button>
+                <button class="btn btn-sm btn-outline" onclick="filterProjects('planning')">Planning</button>
+                <button class="btn btn-sm btn-outline" onclick="filterProjects('active')">Active</button>
+                <button class="btn btn-sm btn-outline" onclick="filterProjects('on_hold')">On Hold</button>
+                <button class="btn btn-sm btn-outline" onclick="filterProjects('completed')">Completed</button>
+            </div>
+            
+            <div id="projectsList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); gap:1rem;">
+                ${projects.length ? projects.map(p => `
+                    <div class="card project-card" data-status="${p.status}" style="border-top:4px solid ${getProjectStatusColor(p.status)};">
+                        <div style="display:flex; justify-content:space-between; align-items:start; gap:0.5rem; flex-wrap:wrap;">
+                            <div>
+                                <h3 style="font-size:1.05rem; margin:0;">${p.name}</h3>
+                                <div style="font-size:0.8rem; color:var(--text-muted);">
+                                    ${p.category || 'General'} • ${getMunicipalityLabel(p.municipality)}
+                                </div>
+                            </div>
+                            <span class="badge ${getProjectStatusBadge(p.status)}">${p.status.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+                        
+                        ${p.description ? `<p style="margin:0.5rem 0; font-size:0.9rem; color:var(--text-muted);">${p.description.substring(0, 100)}${p.description.length > 100 ? '...' : ''}</p>` : ''}
+                        
+                        <div style="margin:0.5rem 0;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.85rem;">
+                                <span>Progress</span>
+                                <span><strong>${p.progress}%</strong></span>
+                            </div>
+                            <div style="width:100%; height:6px; background:var(--surface-alt); border-radius:3px; overflow:hidden;">
+                                <div style="height:100%; width:${p.progress}%; background:${p.progress >= 80 ? '#22c55e' : p.progress >= 50 ? '#f59e0b' : '#3b82f6'}; border-radius:3px; transition:width 0.5s;"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="display:flex; gap:1rem; font-size:0.8rem; color:var(--text-muted); flex-wrap:wrap;">
+                            <span><i class="fas fa-calendar"></i> ${p.start_date ? formatDate(p.start_date) : 'TBD'}</span>
+                            ${p.budget > 0 ? `<span><i class="fas fa-money-bill"></i> KES ${p.budget.toLocaleString()}</span>` : ''}
+                            ${p.spent > 0 ? `<span><i class="fas fa-coins"></i> Spent: KES ${p.spent.toLocaleString()}</span>` : ''}
+                        </div>
+                        
+                        <div style="margin-top:0.75rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <button class="btn btn-info btn-sm" onclick="viewProject(${p.id})">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="addProjectUpdate(${p.id})">
+                                <i class="fas fa-plus"></i> Update
+                            </button>
+                            ${canManage ? `
+                                <button class="btn btn-warning btn-sm" onclick="editProject(${p.id})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('') : '<div class="card text-center text-muted" style="grid-column:1/-1; padding:3rem;">No projects found. Create your first project!</div>'}
+            </div>
+        `);
+    } catch (error) {
+        toast('Error loading projects', 'danger');
+    }
+}
+
+function getProjectStatusColor(status) {
+    const colors = {
+        'planning': '#f59e0b',
+        'active': '#22c55e',
+        'on_hold': '#ef4444',
+        'completed': '#3b82f6',
+        'cancelled': '#6b7280'
+    };
+    return colors[status] || '#6b7280';
+}
+
+function getProjectStatusBadge(status) {
+    const badges = {
+        'planning': 'badge-warning',
+        'active': 'badge-success',
+        'on_hold': 'badge-danger',
+        'completed': 'badge-info',
+        'cancelled': 'badge-secondary'
+    };
+    return badges[status] || 'badge-info';
+}
+
+function filterProjects(status) {
+    const cards = document.querySelectorAll('.project-card');
+    cards.forEach(card => {
+        if (status === 'all' || card.dataset.status === status) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+async function showCreateProjectModal() {
+    const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town'] : [currentUser.municipality];
+    const categories = ['Infrastructure', 'Health', 'Education', 'Water', 'Roads', 'Sanitation', 'Housing', 'Energy', 'Environment', 'Other'];
+    
+    showModal(`
+        <h3><i class="fas fa-plus-circle"></i> Create New Project</h3>
+        <form id="createProjectForm">
+            <div class="form-group">
+                <label>Project Name <span style="color:var(--danger);">*</span></label>
+                <input type="text" id="projectName" required placeholder="Enter project name" />
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="projectDesc" rows="3" placeholder="Describe the project..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Municipality <span style="color:var(--danger);">*</span></label>
+                <select id="projectMunicipality">${municipalities.map(m => `<option value="${m}">${getMunicipalityLabel(m)}</option>`).join('')}</select>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="projectCategory">
+                    <option value="">Select category...</option>
+                    ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="projectStatus">
+                    <option value="planning">Planning</option>
+                    <option value="active">Active</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Priority</label>
+                <select id="projectPriority">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Budget (KES)</label>
+                <input type="number" id="projectBudget" placeholder="0" value="0" />
+            </div>
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" id="projectStart" />
+            </div>
+            <div class="form-group">
+                <label>End Date</label>
+                <input type="date" id="projectEnd" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Create Project</button>
+        </form>
+    `);
+    
+    byId('createProjectForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = byId('projectName').value.trim();
+        if (!name) { toast('Project name is required', 'danger'); return; }
+        
+        const projectData = {
+            name: name,
+            description: byId('projectDesc').value.trim(),
+            municipality: byId('projectMunicipality').value,
+            category: byId('projectCategory').value,
+            status: byId('projectStatus').value,
+            priority: byId('projectPriority').value,
+            budget: parseFloat(byId('projectBudget').value) || 0,
+            start_date: byId('projectStart').value,
+            end_date: byId('projectEnd').value,
+            created_by: currentUser.name,
+            user_id: currentUser.id,
+            user_email: currentUser.email,
+            progress: 0
+        };
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(projectData)
+            });
+            
+            if (response.ok) {
+                closeModal();
+                toast('Project created successfully ✅', 'success');
+                await renderProjects();
+            } else {
+                const error = await response.json();
+                toast(error.error || 'Failed to create project', 'danger');
+            }
+        } catch (error) {
+            toast('Error creating project', 'danger');
+        }
+    });
+}
+
+async function viewProject(projectId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/projects/${projectId}`);
+        const project = await response.json();
+        
+        const milestonesResponse = await fetch(`${API_BASE_URL}/projects/${projectId}/milestones`);
+        const milestones = await milestonesResponse.json();
+        
+        const updatesResponse = await fetch(`${API_BASE_URL}/projects/${projectId}/updates`);
+        const updates = await updatesResponse.json();
+        
+        const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+        
+        showModal(`
+            <div style="max-height:80vh; overflow-y:auto; padding-right:0.5rem;">
+                <div style="display:flex; justify-content:space-between; align-items:start; gap:0.5rem; flex-wrap:wrap;">
+                    <h3 style="margin:0;">${project.name}</h3>
+                    <span class="badge ${getProjectStatusBadge(project.status)}">${project.status.replace('_', ' ').toUpperCase()}</span>
+                </div>
+                <div style="color:var(--text-muted); font-size:0.9rem; margin:0.25rem 0;">
+                    ${getMunicipalityLabel(project.municipality)} • ${project.category || 'General'} • Priority: ${project.priority}
+                </div>
+                
+                ${project.description ? `<p style="margin:0.75rem 0;">${project.description}</p>` : ''}
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin:0.5rem 0; font-size:0.9rem;">
+                    <div><strong>Budget:</strong> KES ${project.budget?.toLocaleString() || '0'}</div>
+                    <div><strong>Spent:</strong> KES ${project.spent?.toLocaleString() || '0'}</div>
+                    <div><strong>Start:</strong> ${project.start_date ? formatDate(project.start_date) : 'TBD'}</div>
+                    <div><strong>End:</strong> ${project.end_date ? formatDate(project.end_date) : 'TBD'}</div>
+                </div>
+                
+                <div style="margin:0.5rem 0;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.9rem;">
+                        <span><strong>Progress</strong></span>
+                        <span><strong>${project.progress}%</strong></span>
+                    </div>
+                    <div style="width:100%; height:8px; background:var(--surface-alt); border-radius:4px; overflow:hidden;">
+                        <div style="height:100%; width:${project.progress}%; background:${project.progress >= 80 ? '#22c55e' : project.progress >= 50 ? '#f59e0b' : '#3b82f6'}; border-radius:4px;"></div>
+                    </div>
+                </div>
+                
+                <!-- Milestones -->
+                <div style="margin-top:1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h4 style="margin:0.5rem 0;"><i class="fas fa-flag-checkered"></i> Milestones</h4>
+                        ${canManage ? `<button class="btn btn-sm btn-primary" onclick="addMilestone(${project.id})"><i class="fas fa-plus"></i> Add</button>` : ''}
+                    </div>
+                    ${milestones.length ? milestones.map(m => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border);">
+                            <div>
+                                <strong>${m.name}</strong>
+                                ${m.description ? `<span style="color:var(--text-muted); font-size:0.8rem;"> - ${m.description}</span>` : ''}
+                            </div>
+                            <span class="badge ${m.status === 'completed' ? 'badge-success' : m.status === 'in_progress' ? 'badge-warning' : 'badge-info'}">${m.status.replace('_', ' ')}</span>
+                        </div>
+                    `).join('') : '<div style="color:var(--text-muted); font-size:0.9rem;">No milestones yet</div>'}
+                </div>
+                
+                <!-- Updates -->
+                <div style="margin-top:1rem;">
+                    <h4 style="margin:0.5rem 0;"><i class="fas fa-history"></i> Updates</h4>
+                    ${updates.length ? updates.slice(0, 10).map(u => `
+                        <div style="padding:0.5rem; background:var(--surface-alt); border-radius:8px; margin-bottom:0.4rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);">
+                                <span><strong>${u.user_name}</strong></span>
+                                <span>${formatDate(u.timestamp)}</span>
+                            </div>
+                            <div>${u.message}</div>
+                            ${u.progress > 0 ? `<div style="font-size:0.8rem; color:var(--text-muted);">Progress: ${u.progress}%</div>` : ''}
+                        </div>
+                    `).join('') : '<div style="color:var(--text-muted); font-size:0.9rem;">No updates yet</div>'}
+                </div>
+                
+                <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button class="btn btn-success btn-sm" onclick="closeModal(); addProjectUpdate(${project.id});">Add Update</button>
+                    <button class="btn btn-outline btn-sm" onclick="closeModal()">Close</button>
+                </div>
+            </div>
+        `);
+    } catch (error) {
+        toast('Error loading project details', 'danger');
+    }
+}
+
+async function addProjectUpdate(projectId) {
+    showModal(`
+        <h3><i class="fas fa-plus-circle"></i> Add Project Update</h3>
+        <form id="projectUpdateForm">
+            <div class="form-group">
+                <label>Message <span style="color:var(--danger);">*</span></label>
+                <textarea id="updateMessage" rows="3" required placeholder="Describe the progress update..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Progress (%)</label>
+                <input type="number" id="updateProgress" min="0" max="100" placeholder="0-100" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Post Update</button>
+        </form>
+    `);
+    
+    byId('projectUpdateForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const message = byId('updateMessage').value.trim();
+        if (!message) { toast('Please enter a message', 'danger'); return; }
+        
+        const progress = parseInt(byId('updateProgress').value) || 0;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/updates`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    user_name: currentUser.name,
+                    message: message,
+                    progress: progress
+                })
+            });
+            
+            if (response.ok) {
+                closeModal();
+                toast('Update posted successfully ✅', 'success');
+                await viewProject(projectId);
+            } else {
+                const error = await response.json();
+                toast(error.error || 'Failed to post update', 'danger');
+            }
+        } catch (error) {
+            toast('Error posting update', 'danger');
+        }
+    });
+}
+
+async function addMilestone(projectId) {
+    showModal(`
+        <h3><i class="fas fa-flag"></i> Add Milestone</h3>
+        <form id="milestoneForm">
+            <div class="form-group">
+                <label>Milestone Name <span style="color:var(--danger);">*</span></label>
+                <input type="text" id="milestoneName" required placeholder="Enter milestone name" />
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="milestoneDesc" rows="2" placeholder="Describe the milestone..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Due Date</label>
+                <input type="date" id="milestoneDue" />
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="milestoneStatus">
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Add Milestone</button>
+        </form>
+    `);
+    
+    byId('milestoneForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = byId('milestoneName').value.trim();
+        if (!name) { toast('Milestone name is required', 'danger'); return; }
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/milestones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    description: byId('milestoneDesc').value.trim(),
+                    due_date: byId('milestoneDue').value,
+                    status: byId('milestoneStatus').value
+                })
+            });
+            
+            if (response.ok) {
+                closeModal();
+                toast('Milestone added ✅', 'success');
+                await viewProject(projectId);
+            } else {
+                const error = await response.json();
+                toast(error.error || 'Failed to add milestone', 'danger');
+            }
+        } catch (error) {
+            toast('Error adding milestone', 'danger');
+        }
+    });
+}
+
+async function editProject(projectId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/projects/${projectId}`);
+        const project = await response.json();
+        
+        const categories = ['Infrastructure', 'Health', 'Education', 'Water', 'Roads', 'Sanitation', 'Housing', 'Energy', 'Environment', 'Other'];
+        
+        showModal(`
+            <h3><i class="fas fa-edit"></i> Edit Project</h3>
+            <form id="editProjectForm">
+                <div class="form-group">
+                    <label>Project Name <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="editProjectName" value="${project.name}" required />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="editProjectDesc" rows="3">${project.description || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="editProjectCategory">
+                        <option value="">Select category...</option>
+                        ${categories.map(c => `<option value="${c}" ${project.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="editProjectStatus">
+                        <option value="planning" ${project.status === 'planning' ? 'selected' : ''}>Planning</option>
+                        <option value="active" ${project.status === 'active' ? 'selected' : ''}>Active</option>
+                        <option value="on_hold" ${project.status === 'on_hold' ? 'selected' : ''}>On Hold</option>
+                        <option value="completed" ${project.status === 'completed' ? 'selected' : ''}>Completed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <select id="editProjectPriority">
+                        <option value="low" ${project.priority === 'low' ? 'selected' : ''}>Low</option>
+                        <option value="medium" ${project.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                        <option value="high" ${project.priority === 'high' ? 'selected' : ''}>High</option>
+                        <option value="critical" ${project.priority === 'critical' ? 'selected' : ''}>Critical</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Budget (KES)</label>
+                    <input type="number" id="editProjectBudget" value="${project.budget || 0}" />
+                </div>
+                <div class="form-group">
+                    <label>Amount Spent (KES)</label>
+                    <input type="number" id="editProjectSpent" value="${project.spent || 0}" />
+                </div>
+                <div class="form-group">
+                    <label>Progress (%)</label>
+                    <input type="number" id="editProjectProgress" min="0" max="100" value="${project.progress || 0}" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> Update Project</button>
+            </form>
+        `);
+        
+        byId('editProjectForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const name = byId('editProjectName').value.trim();
+            if (!name) { toast('Project name is required', 'danger'); return; }
+            
+            const updateData = {
+                name: name,
+                description: byId('editProjectDesc').value.trim(),
+                category: byId('editProjectCategory').value,
+                status: byId('editProjectStatus').value,
+                priority: byId('editProjectPriority').value,
+                budget: parseFloat(byId('editProjectBudget').value) || 0,
+                spent: parseFloat(byId('editProjectSpent').value) || 0,
+                progress: parseInt(byId('editProjectProgress').value) || 0
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (response.ok) {
+                    closeModal();
+                    toast('Project updated successfully ✅', 'success');
+                    await renderProjects();
+                } else {
+                    const error = await response.json();
+                    toast(error.error || 'Failed to update project', 'danger');
+                }
+            } catch (error) {
+                toast('Error updating project', 'danger');
+            }
+        });
+    } catch (error) {
+        toast('Error loading project', 'danger');
+    }
+}
+
+async function deleteProject(projectId) {
+    if (!confirm('Delete this project? This will remove all associated data.')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            toast('Project deleted successfully', 'success');
+            await renderProjects();
+        } else {
+            const error = await response.json();
+            toast(error.error || 'Failed to delete project', 'danger');
+        }
+    } catch (error) {
+        toast('Error deleting project', 'danger');
+    }
 }
 
 // Refresh reports

@@ -164,17 +164,32 @@ class Email(db.Model):
     timestamp = db.Column(db.String, nullable=False)
     read = db.Column(db.Boolean, default=False, nullable=False)
     municipality = db.Column(db.String(50), nullable=False)
+    # Add new fields for better email tracking
+    cc = db.Column(db.String(500), nullable=True)  # CC recipients
+    bcc = db.Column(db.String(500), nullable=True)  # BCC recipients
+    attachments = db.Column(db.Text, default='[]')  # JSON array of attachments
+    is_draft = db.Column(db.Boolean, default=False)
+    is_sent = db.Column(db.Boolean, default=True)
+    reply_to_id = db.Column(db.Integer, nullable=True)  # For email threading
+    in_reply_to = db.Column(db.String(200), nullable=True)  # Message ID for threading
 
     def to_dict(self):
         return {
             'id': self.id,
             'from': self.from_email,
             'to': self.to_email,
+            'cc': self.cc,
+            'bcc': self.bcc,
             'subject': self.subject,
             'body': self.body,
             'timestamp': self.timestamp,
             'read': self.read,
-            'municipality': self.municipality
+            'municipality': self.municipality,
+            'attachments': json.loads(self.attachments) if self.attachments else [],
+            'is_draft': self.is_draft,
+            'is_sent': self.is_sent,
+            'reply_to_id': self.reply_to_id,
+            'in_reply_to': self.in_reply_to
         }
 
 
@@ -304,3 +319,118 @@ class SystemActivity(db.Model):
             'municipality': self.municipality,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
+    
+
+class MeetingAttendance(db.Model):
+    """Model for tracking physical attendance at meetings"""
+    __tablename__ = 'meeting_attendance'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    meeting_id = db.Column(db.Integer, nullable=False)  # Foreign key to meetings
+    user_id = db.Column(db.Integer, nullable=False)  # User who attended
+    user_name = db.Column(db.String(100), nullable=False)
+    user_email = db.Column(db.String(100), nullable=False)
+    check_in_time = db.Column(db.DateTime, default=datetime.utcnow)
+    check_in_method = db.Column(db.String(50), default='manual')  # manual, qr, face
+    location_lat = db.Column(db.Float, nullable=True)
+    location_lng = db.Column(db.Float, nullable=True)
+    location_accuracy = db.Column(db.Float, nullable=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    verified_by = db.Column(db.String(100), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'meeting_id': self.meeting_id,
+            'user_id': self.user_id,
+            'user_name': self.user_name,
+            'user_email': self.user_email,
+            'check_in_time': self.check_in_time.isoformat() if self.check_in_time else None,
+            'check_in_method': self.check_in_method,
+            'location_lat': self.location_lat,
+            'location_lng': self.location_lng,
+            'location_accuracy': self.location_accuracy,
+            'is_verified': self.is_verified,
+            'verified_by': self.verified_by,
+            'notes': self.notes
+        }
+
+
+class Project(db.Model):
+    """Model for municipal project tracking"""
+    __tablename__ = 'projects'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    municipality = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(50), default='planning')  # planning, active, on_hold, completed, cancelled
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high, critical
+    category = db.Column(db.String(50), nullable=True)  # infrastructure, health, education, water, roads, etc.
+    budget = db.Column(db.Float, default=0)
+    spent = db.Column(db.Float, default=0)
+    start_date = db.Column(db.String(20), nullable=True)
+    end_date = db.Column(db.String(20), nullable=True)
+    created_by = db.Column(db.String(100), nullable=False)
+    created_date = db.Column(db.String(20), nullable=False)
+    last_updated = db.Column(db.String(20), nullable=True)
+    progress = db.Column(db.Integer, default=0)  # 0-100
+    files = db.Column(db.Text, default='[]')  # JSON array of file attachments
+    
+    def to_dict(self):
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        try:
+            d['files'] = json.loads(d['files']) if d['files'] else []
+        except:
+            d['files'] = []
+        return d
+
+
+class ProjectMilestone(db.Model):
+    """Model for project milestones"""
+    __tablename__ = 'project_milestones'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.String(20), nullable=True)
+    completed_date = db.Column(db.String(20), nullable=True)
+    status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed
+    progress = db.Column(db.Integer, default=0)  # 0-100
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'name': self.name,
+            'description': self.description,
+            'due_date': self.due_date,
+            'completed_date': self.completed_date,
+            'status': self.status,
+            'progress': self.progress
+        }
+
+
+class ProjectUpdate(db.Model):
+    """Model for project progress updates"""
+    __tablename__ = 'project_updates'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
+    user_name = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    progress = db.Column(db.Integer, default=0)  # 0-100
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    files = db.Column(db.Text, default='[]')
+    
+    def to_dict(self):
+        d = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        try:
+            d['files'] = json.loads(d['files']) if d['files'] else []
+        except:
+            d['files'] = []
+        d['timestamp'] = self.timestamp.isoformat() if self.timestamp else None
+        return d
