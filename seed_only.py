@@ -1,27 +1,18 @@
-# c:\projo\init_db.py
+# seed_only.py
 from app import app, db
-from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast, AuditLog, Report, SystemActivity
+from models import Broadcast, Email, User, Member, Meeting, Complaint, Minute, Document, AuditLog, Report, SystemActivity
 from datetime import date, datetime, timedelta
 from werkzeug.security import generate_password_hash
-from sqlalchemy import text
 import json
 
-def seed_database():
+def seed_data():
     with app.app_context():
-        # Drop all tables first (clean slate)
-        db.drop_all()
-        print("Dropped existing tables")
-        
-        # Create all tables - SQLAlchemy handles order automatically
-        db.create_all()
-        print("Created all tables successfully!")
-
         # Check if users already exist
         if User.query.first():
             print("Database already contains users. Skipping seeding.")
             return
 
-        print("Seeding initial data...")
+        print("Seeding data...")
         today = str(date.today())
         now = datetime.utcnow().isoformat()
 
@@ -228,11 +219,6 @@ def seed_database():
         db.session.add_all(department_officers_data)
         db.session.add(sample_member)
         db.session.add(approved_member)
-        db.session.commit()
-
-        # Get the super admin ID for relationships
-        super_admin_obj = User.query.filter_by(email='dev@muranga.go.ke').first()
-        super_admin_id = super_admin_obj.id
 
         # --- Members ---
         members_data = [
@@ -283,20 +269,13 @@ def seed_database():
             )
         ]
         db.session.add_all(meetings_data)
-        db.session.commit()
-
-        # Get meeting IDs
-        meeting1 = Meeting.query.filter_by(title='Kenol Budget Meeting').first()
-        meeting2 = Meeting.query.filter_by(title='Kangare Development Forum').first()
-        meeting1_id = meeting1.id if meeting1 else 1
-        meeting2_id = meeting2.id if meeting2 else 2
 
         # --- Minutes ---
         minutes_data = [
             Minute(
                 title='Kenol Budget Meeting Minutes',
                 summary='Key decisions: Approved budget allocation for infrastructure projects.',
-                meetingId=meeting1_id,
+                meetingId=1,
                 content='The Kenol Budget Meeting was held on June 20, 2026. All members were present.',
                 uploadedBy='Super Developer',
                 municipality='kenol',
@@ -306,7 +285,7 @@ def seed_database():
             Minute(
                 title='Kangare Development Forum Minutes',
                 summary='Discussion on water supply improvements and road maintenance projects.',
-                meetingId=meeting2_id,
+                meetingId=2,
                 content='The Kangare Development Forum meeting discussed community development projects.',
                 uploadedBy='Super Developer',
                 municipality='kangare',
@@ -405,13 +384,13 @@ def seed_database():
         # --- Audit Logs ---
         audit_logs_data = [
             AuditLog(
-                user_id=super_admin_id,
+                user_id=1,
                 user_name='Super Developer',
                 user_email='dev@muranga.go.ke',
                 action='LOGIN',
                 category='Auth',
                 entity_type='user',
-                entity_id=super_admin_id,
+                entity_id=1,
                 details=json.dumps({'ip': '127.0.0.1'}),
                 ip_address='127.0.0.1',
                 user_agent='Mozilla/5.0',
@@ -419,13 +398,13 @@ def seed_database():
                 municipality='all'
             ),
             AuditLog(
-                user_id=super_admin_id,
+                user_id=1,
                 user_name='Super Developer',
                 user_email='dev@muranga.go.ke',
                 action='CREATE',
                 category='Meetings',
                 entity_type='meeting',
-                entity_id=meeting1_id,
+                entity_id=1,
                 details=json.dumps({'title': 'Kenol Budget Meeting'}),
                 ip_address='127.0.0.1',
                 user_agent='Mozilla/5.0',
@@ -438,22 +417,22 @@ def seed_database():
         # --- System Activities ---
         system_activities_data = [
             SystemActivity(
-                user_id=super_admin_id,
+                user_id=1,
                 user_name='Super Developer',
                 activity_type='user_login',
                 description='Super Developer logged in to the system',
                 entity_type='user',
-                entity_id=super_admin_id,
+                entity_id=1,
                 municipality='all',
                 timestamp=datetime.utcnow() - timedelta(hours=2)
             ),
             SystemActivity(
-                user_id=super_admin_id,
+                user_id=1,
                 user_name='Super Developer',
                 activity_type='meeting_created',
                 description='Meeting "Kenol Budget Meeting" was created',
                 entity_type='meeting',
-                entity_id=meeting1_id,
+                entity_id=1,
                 municipality='kenol',
                 timestamp=datetime.utcnow() - timedelta(hours=1)
             )
@@ -465,7 +444,7 @@ def seed_database():
             Report(
                 report_name='Monthly Summary Report - June 2026',
                 report_type='summary',
-                generated_by=super_admin_id,
+                generated_by=1,
                 generated_by_name='Super Developer',
                 generated_date=datetime.utcnow() - timedelta(hours=3),
                 start_date=datetime.utcnow() - timedelta(days=30),
@@ -481,7 +460,7 @@ def seed_database():
         db.session.commit()
         print("Database seeded successfully!")
         print("\n--- CREDENTIALS ---")
-        print("Super Admin: dev@muranga.go.ke / dev123")
+        print(f"Super Admin: dev@muranga.go.ke / dev123")
         print("Municipal Officers: officer.[municipality]@muranga.go.ke / officer123")
         print("Social Officers: social.[municipality]@muranga.go.ke / social123")
         print("Department Officers: dept.[municipality]@muranga.go.ke / dept123")
@@ -491,4 +470,4 @@ def seed_database():
         print("Reports & Audit features are now available!")
 
 if __name__ == '__main__':
-    seed_database()
+    seed_data()

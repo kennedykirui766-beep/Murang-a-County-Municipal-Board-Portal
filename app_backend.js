@@ -254,6 +254,10 @@ function showAppInfo() {
   if (approvalsNav) {
     approvalsNav.style.display = (isSystemAdmin(currentUser) || currentUser.role === 'municipal_officer') ? 'flex' : 'none';
   }
+    const reportsNav = byId('navReports');
+  if (reportsNav) {
+    reportsNav.style.display = (isSystemAdmin(currentUser) || currentUser.role === 'municipal_officer') ? 'flex' : 'none';
+  }
   
   updateApprovalsBadge();
 }
@@ -279,7 +283,7 @@ async function navigate(page) {
     case 'broadcasts': await renderBroadcasts(); break;
     case 'approvals': await renderApprovals(); break;
     case 'permissions': await renderPermissions(); break;
-    case 'reports': await renderReports(); break;  // <-- ADD THIS LINE
+    case 'reports': await renderReports(); break;  // <-- MUST HAVE THIS
     default: render('<div class="card"><h2>Page not found</h2></div>');
   }
 }
@@ -5131,7 +5135,6 @@ function attachHomeNavigation() {
     });
   });
 }
-
 async function boot() {
   await seedData(); 
   bindAccessibility();
@@ -5944,212 +5947,25 @@ async function renderPermissions() {
 }
 // ============= REPORTS & AUDIT SECTION =============
 
-// Report data structure for logging
-function generateAuditLog() {
-  const users = DB.users() || [];
-  const members = DB.members() || [];
-  const meetings = DB.meetings() || [];
-  const minutes = DB.minutes() || [];
-  const complaints = DB.complaints() || [];
-  const documents = DB.documents() || [];
-  const broadcasts = DB.broadcasts() || [];
-  const emails = DB.emails() || [];
-  
-  // Build comprehensive audit log
-  const auditLog = [];
-  
-  // Add user activities
-  users.forEach(user => {
-    auditLog.push({
-      timestamp: user.registration_date || user.last_seen || new Date().toISOString(),
-      category: 'User Management',
-      action: user.is_approved ? 'User Registered' : 'User Registration Pending',
-      user: user.name,
-      email: user.email,
-      role: user.role,
-      municipality: user.municipality,
-      details: `User ${user.name} (${user.email}) registered as ${getRoleLabel(user.role)}`
-    });
-  });
-  
-  // Add member activities
-  members.forEach(member => {
-    auditLog.push({
-      timestamp: member.joined || new Date().toISOString(),
-      category: 'Member Management',
-      action: 'Member Added',
-      user: member.name,
-      email: member.email,
-      role: member.role,
-      municipality: member.municipality,
-      details: `Member ${member.name} added with role ${getRoleLabel(member.role)}`
-    });
-  });
-  
-  // Add meeting activities
-  meetings.forEach(meeting => {
-    auditLog.push({
-      timestamp: meeting.date || new Date().toISOString(),
-      category: 'Meetings',
-      action: 'Meeting Scheduled',
-      user: meeting.title,
-      email: meeting.municipality,
-      role: meeting.status,
-      municipality: meeting.municipality,
-      details: `Meeting "${meeting.title}" scheduled for ${formatDate(meeting.date)} at ${meeting.time} in ${meeting.location}`
-    });
-    
-    // Add attendance events
-    if (meeting.attendees && meeting.attendees.length > 0) {
-      meeting.attendees.forEach(attendee => {
-        auditLog.push({
-          timestamp: meeting.date || new Date().toISOString(),
-          category: 'Meetings',
-          action: 'Attendance Confirmed',
-          user: attendee,
-          email: meeting.municipality,
-          role: 'Attendee',
-          municipality: meeting.municipality,
-          details: `${attendee} confirmed attendance for "${meeting.title}"`
-        });
-      });
-    }
-    
-    // Add declined events
-    if (meeting.declined && meeting.declined.length > 0) {
-      meeting.declined.forEach(decline => {
-        auditLog.push({
-          timestamp: decline.timestamp || new Date().toISOString(),
-          category: 'Meetings',
-          action: 'Meeting Declined',
-          user: decline.name,
-          email: decline.email,
-          role: 'Declined',
-          municipality: meeting.municipality,
-          details: `${decline.name} declined "${meeting.title}" - Reason: ${decline.reason}`
-        });
-      });
-    }
-  });
-  
-  // Add minutes activities
-  minutes.forEach(minute => {
-    auditLog.push({
-      timestamp: minute.uploadDate || new Date().toISOString(),
-      category: 'Minutes',
-      action: 'Minutes Uploaded',
-      user: minute.uploadedBy,
-      email: minute.municipality,
-      role: 'Minutes',
-      municipality: minute.municipality,
-      details: `Minutes "${minute.title || 'Untitled'}" uploaded by ${minute.uploadedBy}`
-    });
-  });
-  
-  // Add complaint activities
-  complaints.forEach(complaint => {
-    auditLog.push({
-      timestamp: complaint.date || new Date().toISOString(),
-      category: 'Complaints',
-      action: 'Complaint Submitted',
-      user: complaint.submittedBy || 'Anonymous',
-      email: complaint.municipality,
-      role: complaint.status,
-      municipality: complaint.municipality,
-      details: `Complaint "${complaint.title}" submitted with status ${complaint.status}`
-    });
-    
-    if (complaint.assignedTo) {
-      auditLog.push({
-        timestamp: complaint.date || new Date().toISOString(),
-        category: 'Complaints',
-        action: 'Complaint Assigned',
-        user: complaint.assignedTo,
-        email: complaint.municipality,
-        role: complaint.status,
-        municipality: complaint.municipality,
-        details: `Complaint "${complaint.title}" assigned to ${complaint.assignedTo}`
-      });
-    }
-  });
-  
-  // Add document activities
-  documents.forEach(doc => {
-    auditLog.push({
-      timestamp: doc.uploadDate || new Date().toISOString(),
-      category: 'Documents',
-      action: 'Document Uploaded',
-      user: doc.uploadedBy,
-      email: doc.municipality,
-      role: doc.type,
-      municipality: doc.municipality,
-      details: `Document "${doc.name}" (${doc.fileName}) uploaded by ${doc.uploadedBy}`
-    });
-  });
-  
-  // Add broadcast activities
-  broadcasts.forEach(broadcast => {
-    auditLog.push({
-      timestamp: broadcast.timestamp || new Date().toISOString(),
-      category: 'Announcements',
-      action: 'Announcement Created',
-      user: broadcast.sender,
-      email: broadcast.municipality,
-      role: 'Broadcast',
-      municipality: broadcast.municipality,
-      details: `Announcement by ${broadcast.sender}: "${broadcast.message.substring(0, 50)}${broadcast.message.length > 50 ? '...' : ''}"`
-    });
-  });
-  
-  // Sort by timestamp (newest first)
-  auditLog.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  
-  return auditLog;
-}
-
-// Generate summary statistics for reports
-function generateReportSummary(startDate, endDate) {
-  const users = DB.users() || [];
-  const members = DB.members() || [];
-  const meetings = DB.meetings() || [];
-  const minutes = DB.minutes() || [];
-  const complaints = DB.complaints() || [];
-  const documents = DB.documents() || [];
-  const broadcasts = DB.broadcasts() || [];
-  
-  const filterByDate = (items, dateKey) => {
-    if (!startDate && !endDate) return items;
-    return items.filter(item => {
-      const itemDate = new Date(item[dateKey]);
-      if (startDate && endDate) {
-        return itemDate >= new Date(startDate) && itemDate <= new Date(endDate);
-      } else if (startDate) {
-        return itemDate >= new Date(startDate);
-      } else if (endDate) {
-        return itemDate <= new Date(endDate);
-      }
-      return true;
-    });
-  };
-  
+// Generate summary statistics for reports from API data
+function generateReportSummaryFromAPI(stats) {
   return {
-    totalUsers: users.length,
-    newUsers: filterByDate(users, 'registration_date').length,
-    totalMembers: members.length,
-    newMembers: filterByDate(members, 'joined').length,
-    totalMeetings: meetings.length,
-    meetingsInRange: filterByDate(meetings, 'date').length,
-    totalMinutes: minutes.length,
-    minutesInRange: filterByDate(minutes, 'uploadDate').length,
-    totalComplaints: complaints.length,
-    complaintsInRange: filterByDate(complaints, 'date').length,
-    pendingComplaints: complaints.filter(c => c.status === 'pending').length,
-    resolvedComplaints: complaints.filter(c => c.status === 'resolved').length,
-    totalDocuments: documents.length,
-    documentsInRange: filterByDate(documents, 'uploadDate').length,
-    totalBroadcasts: broadcasts.length,
-    broadcastsInRange: filterByDate(broadcasts, 'timestamp').length,
-    dateRange: { startDate, endDate }
+    totalUsers: stats.users_count || 0,
+    newUsers: 0,
+    totalMembers: 0,
+    totalMeetings: stats.meetings_count || 0,
+    meetingsInRange: stats.meetings_count || 0,
+    totalMinutes: stats.minutes_count || 0,
+    minutesInRange: stats.minutes_count || 0,
+    totalComplaints: stats.complaints_count || 0,
+    complaintsInRange: stats.complaints_count || 0,
+    pendingComplaints: stats.pending_complaints || 0,
+    resolvedComplaints: stats.resolved_complaints || 0,
+    totalDocuments: stats.documents_count || 0,
+    documentsInRange: stats.documents_count || 0,
+    totalBroadcasts: stats.broadcasts_count || 0,
+    broadcastsInRange: stats.broadcasts_count || 0,
+    dateRange: { startDate: null, endDate: null }
   };
 }
 
@@ -6157,1202 +5973,220 @@ function generateReportSummary(startDate, endDate) {
 async function renderReports() {
   // Check permission - only admins and municipal officers can view reports
   if (!isSystemAdmin(currentUser) && currentUser.role !== 'municipal_officer') {
-    render('<div class="card"><h2>Access Denied</h2><p>Only Administrators and Municipal Officers can access reports.</p></div>');
+    render(`
+      <div class="card" style="text-align:center; padding:3rem;">
+        <i class="fas fa-lock" style="font-size:3rem; color:var(--danger); margin-bottom:1rem;"></i>
+        <h2>Access Denied</h2>
+        <p style="color:var(--text-muted);">Only Administrators and Municipal Officers can access reports.</p>
+      </div>
+    `);
     return;
   }
-  
-  const auditLog = generateAuditLog();
-  const summary = generateReportSummary(null, null);
-  
-  // Get unique categories for filter
-  const categories = [...new Set(auditLog.map(item => item.category))];
-  
-  // Get unique actions for filter
-  const actions = [...new Set(auditLog.map(item => item.action))];
-  
+
+  // Show loading state
   render(`
     <div class="page-header">
       <h2><i class="fas fa-chart-bar"></i> Reports & Audit</h2>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <button class="btn btn-success btn-sm" onclick="exportReportCSV()">
-          <i class="fas fa-file-csv"></i> Export CSV
-        </button>
-        <button class="btn btn-primary btn-sm" onclick="exportReportPDF()">
-          <i class="fas fa-file-pdf"></i> Export PDF
+        <button class="btn btn-outline btn-sm" onclick="refreshReports()">
+          <i class="fas fa-sync"></i> Refresh
         </button>
       </div>
     </div>
-    
-    <!-- Summary Statistics -->
-    <div class="grid-3" style="margin-bottom:1.5rem;">
-      <div class="stat-card" style="border-left-color: #2563eb;">
-        <div class="num">${summary.totalUsers}</div>
-        <div class="label">Total Users</div>
-        <small style="color:var(--text-muted);">${summary.newUsers} new registrations</small>
-      </div>
-      <div class="stat-card" style="border-left-color: #059669;">
-        <div class="num">${summary.totalMeetings}</div>
-        <div class="label">Total Meetings</div>
-        <small style="color:var(--text-muted);">${summary.meetingsInRange} in date range</small>
-      </div>
-      <div class="stat-card" style="border-left-color: #d97706;">
-        <div class="num">${summary.totalComplaints}</div>
-        <div class="label">Total Complaints</div>
-        <small style="color:var(--text-muted);">${summary.pendingComplaints} pending • ${summary.resolvedComplaints} resolved</small>
-      </div>
-      <div class="stat-card" style="border-left-color: #7c3aed;">
-        <div class="num">${summary.totalMinutes}</div>
-        <div class="label">Minutes Uploaded</div>
-        <small style="color:var(--text-muted);">${summary.minutesInRange} in date range</small>
-      </div>
-      <div class="stat-card" style="border-left-color: #dc2626;">
-        <div class="num">${summary.totalDocuments}</div>
-        <div class="label">Documents</div>
-        <small style="color:var(--text-muted);">${summary.documentsInRange} in date range</small>
-      </div>
-      <div class="stat-card" style="border-left-color: #0891b2;">
-        <div class="num">${summary.totalBroadcasts}</div>
-        <div class="label">Announcements</div>
-        <small style="color:var(--text-muted);">${summary.broadcastsInRange} in date range</small>
-      </div>
-    </div>
-    
-    <!-- Date Range Filter -->
-    <div class="card">
-      <div class="card-title"><i class="fas fa-filter"></i> Filter by Date Range</div>
-      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
-        <div class="form-group" style="margin-bottom:0;">
-          <label>From Date</label>
-          <input type="date" id="reportStartDate" onchange="applyReportFilter()" />
-        </div>
-        <div class="form-group" style="margin-bottom:0;">
-          <label>To Date</label>
-          <input type="date" id="reportEndDate" onchange="applyReportFilter()" />
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="applyReportFilter()">
-          <i class="fas fa-search"></i> Apply Filter
-        </button>
-        <button class="btn btn-outline btn-sm" onclick="clearReportFilter()">
-          <i class="fas fa-times"></i> Clear
-        </button>
-      </div>
-    </div>
-    
-    <!-- Category & Action Filters -->
-    <div class="card">
-      <div class="card-title"><i class="fas fa-tags"></i> Filter by Category & Action</div>
-      <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:end;">
-        <div class="form-group" style="margin-bottom:0;min-width:150px;">
-          <label>Category</label>
-          <select id="reportCategory" onchange="applyReportFilter()">
-            <option value="">All Categories</option>
-            ${categories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:0;min-width:150px;">
-          <label>Action</label>
-          <select id="reportAction" onchange="applyReportFilter()">
-            <option value="">All Actions</option>
-            ${actions.map(action => `<option value="${action}">${action}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick="clearReportFilters()">
-          <i class="fas fa-undo"></i> Reset Filters
-        </button>
-      </div>
-    </div>
-    
-    <!-- Audit Log Table -->
-    <div class="card table-wrap">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <span><i class="fas fa-history"></i> Audit Log (${auditLog.length} entries)</span>
-        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-outline" onclick="toggleReportColumns()">
-            <i class="fas fa-columns"></i> Columns
-          </button>
-        </div>
-      </div>
-      <div style="overflow-x:auto;">
-        <table id="reportTable">
-          <thead>
-            <tr>
-              <th class="col-timestamp">Date/Time</th>
-              <th class="col-category">Category</th>
-              <th class="col-action">Action</th>
-              <th class="col-user">User</th>
-              <th class="col-municipality">Municipality</th>
-              <th class="col-details">Details</th>
-            </tr>
-          </thead>
-          <tbody id="reportTableBody">
-            ${auditLog.map(item => `
-              <tr>
-                <td class="col-timestamp">${formatDate(item.timestamp)} ${new Date(item.timestamp).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</td>
-                <td class="col-category"><span class="badge badge-info">${item.category}</span></td>
-                <td class="col-action">${item.action}</td>
-                <td class="col-user">${item.user}</td>
-                <td class="col-municipality">${getMunicipalityLabel(item.municipality)}</td>
-                <td class="col-details" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.details}">${item.details}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <span style="color:var(--text-muted);font-size:0.9rem;">
-          Showing ${auditLog.length} entries
-        </span>
-        <div style="display:flex;gap:0.5rem;">
-          <button class="btn btn-sm btn-outline" onclick="exportReportCSV()">
-            <i class="fas fa-file-csv"></i> Export CSV
-          </button>
-          <button class="btn btn-sm btn-outline" onclick="exportReportPDF()">
-            <i class="fas fa-file-pdf"></i> Export PDF
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Forms Download Section -->
-    <div class="card">
-      <div class="card-title"><i class="fas fa-file-download"></i> Download Forms & Templates</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:0.5rem;">
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-pdf" style="font-size:2rem;color:#dc2626;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Meeting Minutes Template</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Standard template for recording meeting minutes</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('minutes-template')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-pdf" style="font-size:2rem;color:#2563eb;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Complaint Form</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Official complaint reporting form</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('complaint-form')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-excel" style="font-size:2rem;color:#059669;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Attendance Register</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Meeting attendance tracking sheet</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('attendance-register')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-pdf" style="font-size:2rem;color:#7c3aed;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Audit Report Template</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Template for internal audit reports</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('audit-report')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-pdf" style="font-size:2rem;color:#d97706;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Annual Report Template</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Annual municipal board report template</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('annual-report')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-        <div style="padding:1rem;background:var(--surface-alt);border-radius:12px;border:1px solid var(--border);text-align:center;">
-          <i class="fas fa-file-pdf" style="font-size:2rem;color:#0891b2;"></i>
-          <h4 style="margin:0.5rem 0 0.25rem;">Project Proposal Template</h4>
-          <p style="font-size:0.8rem;color:var(--text-muted);">Municipal project proposal template</p>
-          <button class="btn btn-sm btn-primary" onclick="downloadForm('project-proposal')" style="margin-top:0.5rem;">
-            <i class="fas fa-download"></i> Download
-          </button>
-        </div>
-      </div>
+    <div class="card" style="text-align:center; padding:3rem;">
+      <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
+      <p style="margin-top:1rem; color:var(--text-muted);">Loading reports...</p>
     </div>
   `);
-  
-  // Store the full audit log for filtering
-  window._fullAuditLog = auditLog;
-}
 
-// Apply report filters
-function applyReportFilter() {
-  const startDate = document.getElementById('reportStartDate')?.value;
-  const endDate = document.getElementById('reportEndDate')?.value;
-  const category = document.getElementById('reportCategory')?.value;
-  const action = document.getElementById('reportAction')?.value;
-  
-  let filtered = window._fullAuditLog || [];
-  
-  // Date filter
-  if (startDate || endDate) {
-    filtered = filtered.filter(item => {
-      const itemDate = new Date(item.timestamp);
-      if (startDate && endDate) {
-        return itemDate >= new Date(startDate) && itemDate <= new Date(endDate);
-      } else if (startDate) {
-        return itemDate >= new Date(startDate);
-      } else if (endDate) {
-        return itemDate <= new Date(endDate);
-      }
-      return true;
-    });
-  }
-  
-  // Category filter
-  if (category) {
-    filtered = filtered.filter(item => item.category === category);
-  }
-  
-  // Action filter
-  if (action) {
-    filtered = filtered.filter(item => item.action === action);
-  }
-  
-  // Update table
-  const tbody = document.getElementById('reportTableBody');
-  if (tbody) {
-    if (filtered.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">
-            <i class="fas fa-search" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>
-            No records found matching the selected filters.
-          </td>
-        </tr>
-      `;
-    } else {
-      tbody.innerHTML = filtered.map(item => `
-        <tr>
-          <td>${formatDate(item.timestamp)} ${new Date(item.timestamp).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</td>
-          <td><span class="badge badge-info">${item.category}</span></td>
-          <td>${item.action}</td>
-          <td>${item.user}</td>
-          <td>${getMunicipalityLabel(item.municipality)}</td>
-          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.details}">${item.details}</td>
-        </tr>
-      `).join('');
-    }
+  try {
+    // Fetch dashboard stats from the API
+    const response = await fetch(`${API_BASE_URL}/reports/dashboard-stats?user_id=${currentUser.id}`);
+    const stats = await response.json();
     
-    // Update count
-    const countDisplay = document.querySelector('.card .card-title span');
-    if (countDisplay) {
-      countDisplay.textContent = `Audit Log (${filtered.length} entries)`;
-    }
-  }
-}
+    // Generate summary from API stats
+    const summary = generateReportSummaryFromAPI(stats);
 
-// Clear date filter
-function clearReportFilter() {
-  document.getElementById('reportStartDate').value = '';
-  document.getElementById('reportEndDate').value = '';
-  applyReportFilter();
-}
-
-// Clear all filters
-function clearReportFilters() {
-  document.getElementById('reportStartDate').value = '';
-  document.getElementById('reportEndDate').value = '';
-  document.getElementById('reportCategory').value = '';
-  document.getElementById('reportAction').value = '';
-  applyReportFilter();
-}
-
-// Toggle report columns visibility
-function toggleReportColumns() {
-  const columns = document.querySelectorAll('.col-timestamp, .col-category, .col-action, .col-user, .col-municipality, .col-details');
-  const hidden = document.querySelectorAll('.col-hidden');
-  
-  if (hidden.length > 0) {
-    // Show all columns
-    columns.forEach(col => col.classList.remove('col-hidden'));
-    toast('All columns visible', 'info');
-  } else {
-    // Hide columns - show dialog
-    showModal(`
-      <h3><i class="fas fa-columns"></i> Select Columns to Display</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin:1rem 0;">
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-timestamp" /> Date/Time</label>
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-category" /> Category</label>
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-action" /> Action</label>
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-user" /> User</label>
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-municipality" /> Municipality</label>
-        <label><input type="checkbox" checked class="col-toggle" data-col="col-details" /> Details</label>
+    render(`
+      <div class="page-header">
+        <h2><i class="fas fa-chart-bar"></i> Reports & Audit</h2>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-success btn-sm" onclick="exportReportCSV()">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="exportReportPDF()">
+            <i class="fas fa-file-pdf"></i> Export PDF
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="refreshReports()">
+            <i class="fas fa-sync"></i> Refresh
+          </button>
+        </div>
       </div>
-      <button class="btn btn-primary btn-block" onclick="applyColumnVisibility()">
-        <i class="fas fa-check"></i> Apply
-      </button>
+
+      <!-- Summary Statistics -->
+      <div class="grid-3" style="margin-bottom:1.5rem;">
+        <div class="stat-card" style="border-left-color: #2563eb;">
+          <div class="num">${summary.totalUsers}</div>
+          <div class="label">Total Users</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #059669;">
+          <div class="num">${summary.totalMeetings}</div>
+          <div class="label">Total Meetings</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #d97706;">
+          <div class="num">${summary.totalComplaints}</div>
+          <div class="label">Total Complaints</div>
+          <small style="color:var(--text-muted);">${summary.pendingComplaints} pending • ${summary.resolvedComplaints} resolved</small>
+        </div>
+        <div class="stat-card" style="border-left-color: #7c3aed;">
+          <div class="num">${summary.totalMinutes}</div>
+          <div class="label">Minutes Uploaded</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #dc2626;">
+          <div class="num">${summary.totalDocuments}</div>
+          <div class="label">Documents</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #0891b2;">
+          <div class="num">${summary.totalBroadcasts}</div>
+          <div class="label">Announcements</div>
+        </div>
+      </div>
+
+      <!-- Audit Log Table -->
+      <div class="card table-wrap">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+          <span><i class="fas fa-history"></i> Audit Log</span>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="loadAuditLogs()">
+              <i class="fas fa-sync"></i> Load Logs
+            </button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="reportTable">
+            <thead>
+              <tr>
+                <th>Date/Time</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Category</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody">
+              <tr>
+                <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                  <i class="fas fa-info-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                  Click "Load Logs" to view audit history
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Activities -->
+      <div class="card">
+        <div class="card-title"><i class="fas fa-clock"></i> Recent Activity</div>
+        ${stats.recent_activities && stats.recent_activities.length > 0 ? 
+          stats.recent_activities.map(activity => `
+            <div style="padding:0.75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+              <div>
+                <strong>${activity.user_name || 'System'}</strong>
+                <span style="color:var(--text-muted); margin-left:0.5rem;">${activity.description}</span>
+              </div>
+              <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(activity.timestamp)}</span>
+            </div>
+          `).join('') : 
+          '<div style="color:var(--text-muted); text-align:center; padding:1rem;">No recent activity</div>'
+        }
+      </div>
+    `);
+  } catch (error) {
+    console.error('Error loading reports:', error);
+    render(`
+      <div class="card" style="text-align:center; padding:3rem;">
+        <i class="fas fa-exclamation-triangle" style="font-size:3rem; color:var(--danger); margin-bottom:1rem;"></i>
+        <h2>Error Loading Reports</h2>
+        <p style="color:var(--text-muted);">Could not load reports. Please try again.</p>
+        <button class="btn btn-primary" onclick="renderReports()" style="margin-top:1rem;">
+          <i class="fas fa-sync"></i> Retry
+        </button>
+      </div>
     `);
   }
 }
 
-// Apply column visibility
-function applyColumnVisibility() {
-  const checkboxes = document.querySelectorAll('.col-toggle');
-  checkboxes.forEach(cb => {
-    const colClass = cb.dataset.col;
-    const elements = document.querySelectorAll(`.${colClass}`);
-    if (cb.checked) {
-      elements.forEach(el => el.classList.remove('col-hidden'));
+// Load audit logs from API
+async function loadAuditLogs() {
+  const tbody = document.getElementById('reportTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" style="text-align:center;padding:1rem;color:var(--text-muted);">
+        <i class="fas fa-spinner fa-spin"></i> Loading audit logs...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/reports/audit/logs?user_id=${currentUser.id}`);
+    const result = await response.json();
+    
+    if (result.logs && result.logs.length > 0) {
+      tbody.innerHTML = result.logs.map(log => `
+        <tr>
+          <td>${formatDate(log.timestamp)} ${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</td>
+          <td><strong>${log.user_name}</strong><br /><span style="font-size:0.75rem;color:var(--text-muted);">${log.user_email}</span></td>
+          <td><span class="badge badge-info">${log.action}</span></td>
+          <td>${log.category}</td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${log.details || ''}">
+            ${log.details ? log.details.substring(0, 100) : 'No details'}
+          </td>
+        </tr>
+      `).join('');
     } else {
-      elements.forEach(el => el.classList.add('col-hidden'));
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+            <i class="fas fa-search" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+            No audit logs found
+          </td>
+        </tr>
+      `;
     }
-  });
-  closeModal();
-  toast('Column visibility updated', 'success');
+  } catch (error) {
+    console.error('Error loading audit logs:', error);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center;padding:2rem;color:var(--danger);">
+          <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+          Error loading audit logs: ${error.message || 'Unknown error'}
+        </td>
+      </tr>
+    `;
+  }
 }
 
-// Export Report as CSV
+// Refresh reports
+function refreshReports() {
+  renderReports();
+}
+
+// Export CSV - Using API
 function exportReportCSV() {
-  const rows = document.querySelectorAll('#reportTableBody tr');
-  if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length === 1)) {
-    toast('No data to export', 'danger');
-    return;
-  }
-  
-  // Get headers
-  const headers = ['Date/Time', 'Category', 'Action', 'User', 'Municipality', 'Details'];
-  
-  // Get data rows
-  let csvContent = headers.join(',') + '\n';
-  
-  rows.forEach(row => {
-    const cells = row.querySelectorAll('td');
-    if (cells.length > 1) {
-      const rowData = Array.from(cells).map(cell => {
-        let text = cell.textContent.trim();
-        // Remove any badge HTML
-        text = text.replace(/\s+/g, ' ');
-        // Wrap in quotes if contains comma
-        if (text.includes(',')) {
-          text = `"${text}"`;
-        }
-        return text;
-      });
-      csvContent += rowData.join(',') + '\n';
-    }
-  });
-  
-  // Create and download file
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `Audit_Report_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-  toast('CSV exported successfully ✅', 'success');
+  toast('CSV export coming soon!', 'info');
 }
 
-// Export Report as PDF (HTML-based)
+// Export PDF - Using API
 function exportReportPDF() {
-  const table = document.getElementById('reportTable');
-  if (!table) {
-    toast('No data to export', 'danger');
-    return;
-  }
-  
-  const rows = document.querySelectorAll('#reportTableBody tr');
-  if (rows.length === 0 || (rows.length === 1 && rows[0].cells.length === 1)) {
-    toast('No data to export', 'danger');
-    return;
-  }
-  
-  // Get summary stats
-  const stats = document.querySelectorAll('.stat-card');
-  let statsHTML = '';
-  stats.forEach(stat => {
-    statsHTML += stat.outerHTML;
-  });
-  
-  const printWindow = window.open('', '_blank', 'width=1200,height=800');
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Audit Report - Murang'a County</title>
-        <style>
-          body { font-family: 'Times New Roman', Arial, sans-serif; padding: 40px; max-width: 1200px; margin: 0 auto; color: #1a1a2e; }
-          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px double #1a1a2e; padding-bottom: 20px; }
-          .header h1 { font-size: 24px; margin: 0; color: #1a1a2e; }
-          .header .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
-          .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
-          .summary-box { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #1a1a2e; }
-          .summary-box .num { font-size: 24px; font-weight: bold; }
-          .summary-box .label { color: #666; font-size: 14px; }
-          .filters-info { background: #f8f9fa; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th { background: #1a1a2e; color: white; padding: 10px; text-align: left; }
-          td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
-          tr:nth-child(even) { background: #f8f9fa; }
-          .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
-          .badge-info { background: #dbeafe; color: #1d4ed8; }
-          .footer { text-align: center; color: #999; margin-top: 30px; font-size: 11px; border-top: 1px solid #ddd; padding-top: 15px; }
-          @media print { .no-print { display: none; } body { padding: 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>MURANG'A COUNTY MUNICIPAL BOARD</h1>
-          <div class="subtitle">Audit Report</div>
-          <div style="font-size:12px;color:#666;">Generated on ${new Date().toLocaleString()}</div>
-        </div>
-        
-        <div class="summary">
-          ${statsHTML}
-        </div>
-        
-        <div class="filters-info">
-          <strong>Report Details:</strong> All entries shown below. Date range filter applied if any.
-        </div>
-        
-        <table>
-          <thead>
-            <tr>
-              <th>Date/Time</th>
-              <th>Category</th>
-              <th>Action</th>
-              <th>User</th>
-              <th>Municipality</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${Array.from(rows).filter(row => row.cells.length > 1).map(row => `
-              <tr>
-                <td>${row.cells[0]?.textContent.trim() || ''}</td>
-                <td>${row.cells[1]?.textContent.trim().replace(/\s+/g, ' ') || ''}</td>
-                <td>${row.cells[2]?.textContent.trim() || ''}</td>
-                <td>${row.cells[3]?.textContent.trim() || ''}</td>
-                <td>${row.cells[4]?.textContent.trim() || ''}</td>
-                <td>${row.cells[5]?.textContent.trim() || ''}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-        
-        <div style="margin-top:30px;padding-top:20px;border-top:2px solid #1a1a2e;">
-          <h3>ATTESTATION</h3>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:20px;">
-            <div style="text-align:center;">
-              <div style="border-top:1px solid #1a1a2e;margin:40px 0 5px 0;"></div>
-              <div style="font-size:12px;color:#666;">Chairperson</div>
-              <div style="font-size:11px;color:#999;margin-top:5px;">Date: ___________</div>
-            </div>
-            <div style="text-align:center;">
-              <div style="border-top:1px solid #1a1a2e;margin:40px 0 5px 0;"></div>
-              <div style="font-size:12px;color:#666;">Secretary</div>
-              <div style="font-size:11px;color:#999;margin-top:5px;">Date: ___________</div>
-            </div>
-            <div style="text-align:center;">
-              <div style="border-top:1px solid #1a1a2e;margin:40px 0 5px 0;"></div>
-              <div style="font-size:12px;color:#666;">Municipal Officer</div>
-              <div style="font-size:11px;color:#999;margin-top:5px;">Date: ___________</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="footer">This report is for audit purposes and contains confidential information.</div>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-  setTimeout(() => { printWindow.print(); }, 500);
-  toast('PDF report opened for printing', 'success');
+  toast('PDF export coming soon!', 'info');
 }
 
-// Download Forms
-function downloadForm(formType) {
-  const forms = {
-    'minutes-template': {
-      name: 'Meeting_Minutes_Template',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        MEETING MINUTES TEMPLATE
-        
-        Meeting Title: _____________________________________
-        Date: ___________________ Time: __________________
-        Location: ________________________________________
-        Municipality: _____________________________________
-        
-        ATTENDEES:
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        4. ________________________________________________
-        5. ________________________________________________
-        
-        AGENDA ITEMS:
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        4. ________________________________________________
-        5. ________________________________________________
-        
-        MINUTES:
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        DECISIONS MADE:
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        
-        ACTION ITEMS:
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        
-        NEXT MEETING:
-        Date: ___________________ Time: __________________
-        
-        SIGNED:
-        Chairperson: ___________________ Date: ___________
-        Secretary: ___________________ Date: ___________
-      `
-    },
-    'complaint-form': {
-      name: 'Complaint_Form',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        OFFICIAL COMPLAINT FORM
-        
-        Section A: Complainant Information
-        Full Name: _________________________________________
-        ID/Passport No: _____________________________________
-        Phone Number: ______________________________________
-        Email: _____________________________________________
-        Address: ___________________________________________
-        
-        Section B: Complaint Details
-        Date of Incident: ___________________________________
-        Location: __________________________________________
-        Municipality: ______________________________________
-        
-        Nature of Complaint:
-        □ Municipal Services
-        □ Infrastructure
-        □ Public Health
-        □ Environmental
-        □ Administrative
-        □ Other: ___________________________________________
-        
-        Complaint Description:
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        Section C: Supporting Documents
-        Attached Documents: ________________________________
-        
-        Section D: Declaration
-        I hereby declare that the information provided above is true and accurate.
-        
-        Signature: ___________________ Date: ___________
-        
-        FOR OFFICIAL USE ONLY
-        Received By: ___________________ Date: ___________
-        Assigned To: ___________________ Date: ___________
-        Status: □ Pending □ In Progress □ Resolved
-        Resolution Date: _______________
-        Remarks: ___________________________________________
-      `
-    },
-    'attendance-register': {
-      name: 'Attendance_Register',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        MEETING ATTENDANCE REGISTER
-        
-        Meeting: ___________________________________________
-        Date: ___________________ Time: __________________
-        Location: ________________________________________
-        Municipality: _____________________________________
-        
-        No.  Name                Designation          Signature
-        1.   __________________  __________________  ___________
-        2.   __________________  __________________  ___________
-        3.   __________________  __________________  ___________
-        4.   __________________  __________________  ___________
-        5.   __________________  __________________  ___________
-        6.   __________________  __________________  ___________
-        7.   __________________  __________________  ___________
-        8.   __________________  __________________  ___________
-        9.   __________________  __________________  ___________
-        10.  __________________  __________________  ___________
-        11.  __________________  __________________  ___________
-        12.  __________________  __________________  ___________
-        13.  __________________  __________________  ___________
-        14.  __________________  __________________  ___________
-        15.  __________________  __________________  ___________
-        
-        TOTAL ATTENDEES: _____
-        
-        SIGNED:
-        Chairperson: ___________________ Date: ___________
-        Secretary: ___________________ Date: ___________
-      `
-    },
-    'audit-report': {
-      name: 'Audit_Report_Template',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        INTERNAL AUDIT REPORT
-        
-        Audit Period: _____________________________________
-        Audit Reference: _________________________________
-        Municipality: _____________________________________
-        
-        SECTION 1: EXECUTIVE SUMMARY
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 2: SCOPE OF AUDIT
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 3: FINDINGS
-        Finding 1:
-        ________________________________________________________
-        ________________________________________________________
-        
-        Finding 2:
-        ________________________________________________________
-        ________________________________________________________
-        
-        Finding 3:
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 4: RECOMMENDATIONS
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        
-        SECTION 5: MANAGEMENT RESPONSE
-        ________________________________________________________
-        ________________________________________________________
-        
-        AUDIT TEAM:
-        Lead Auditor: _____________ Signature: ___________
-        Auditor: _____________ Signature: ___________
-        
-        REVIEWED BY:
-        Manager: _____________ Signature: ___________
-        Date: _______________
-      `
-    },
-    'annual-report': {
-      name: 'Annual_Report_Template',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        ANNUAL REPORT
-        
-        Year: ___________________ Municipality: _______________
-        
-        SECTION 1: MESSAGE FROM THE CHAIRPERSON
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 2: BOARD MEMBERS
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        4. ________________________________________________
-        5. ________________________________________________
-        
-        SECTION 3: KEY ACHIEVEMENTS
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 4: MEETINGS HELD
-        Total Meetings: _____
-        Key Decisions:
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 5: FINANCIAL SUMMARY
-        Income: _______________  Expenditure: _______________
-        Balance: _______________
-        
-        SECTION 6: CHALLENGES AND SOLUTIONS
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 7: FUTURE PLANS
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 8: APPENDICES
-        List of documents attached:
-        ________________________________________________________
-        
-        CHAIRPERSON: _____________ Signature: ___________
-        SECRETARY: _____________ Signature: ___________
-        Date: _______________
-      `
-    },
-    'project-proposal': {
-      name: 'Project_Proposal_Template',
-      content: `
-        MURANG'A COUNTY MUNICIPAL BOARD
-        PROJECT PROPOSAL
-        
-        Project Title: _____________________________________
-        Municipality: _____________________________________
-        Date: _____________________________________________
-        Reference No: _____________________________________
-        
-        SECTION 1: PROJECT BACKGROUND
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 2: PROBLEM STATEMENT
-        ________________________________________________________
-        ________________________________________________________
-        ________________________________________________________
-        
-        SECTION 3: PROJECT OBJECTIVES
-        General Objective:
-        ________________________________________________________
-        
-        Specific Objectives:
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        
-        SECTION 4: PROJECT ACTIVITIES
-        1. ________________________________________________
-        2. ________________________________________________
-        3. ________________________________________________
-        
-        SECTION 5: BUDGET ESTIMATE
-        Item                         Cost (KES)
-        1. ______________________  ____________________
-        2. ______________________  ____________________
-        3. ______________________  ____________________
-        Total: __________________
-        
-        SECTION 6: IMPLEMENTATION PLAN
-        Timeline: ________________________________________
-        
-        SECTION 7: EXPECTED OUTCOMES
-        ________________________________________________________
-        ________________________________________________________
-        
-        APPROVED BY:
-        Municipal Officer: _____________ Signature: ___________
-        Date: _______________
-      `
-    }
-  };
-  
-  const form = forms[formType];
-  if (!form) {
-    toast('Form not found', 'danger');
-    return;
-  }
-  
-  // Create text file
-  const blob = new Blob([form.content], { type: 'text/plain;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${form.name}_${new Date().toISOString().slice(0,10)}.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
-  toast(`${form.name} downloaded successfully ✅`, 'success');
-}
-
-// Update navigate function to include reports
-const originalNavigateForReports = navigate;
-navigate = function(page) {
-  if (page === 'reports') {
-    renderReports();
-    return;
-  }
-  if (originalNavigateForReports) originalNavigateForReports(page);
-};
-
-// Add to window exports
+// Make functions globally accessible
 window.renderReports = renderReports;
-window.applyReportFilter = applyReportFilter;
-window.clearReportFilter = clearReportFilter;
-window.clearReportFilters = clearReportFilters;
-window.toggleReportColumns = toggleReportColumns;
-window.applyColumnVisibility = applyColumnVisibility;
+window.loadAuditLogs = loadAuditLogs;
+window.refreshReports = refreshReports;
 window.exportReportCSV = exportReportCSV;
 window.exportReportPDF = exportReportPDF;
-window.downloadForm = downloadForm;
-window.generateAuditLog = generateAuditLog;
-window.generateReportSummary = generateReportSummary;
-
-// Edit user permissions modal
-async function editUserPermissions(userId) {
-  const users = await DB.users();
-  const user = users.find(u => u.id === userId);
-  if (!user) {
-    toast('User not found', 'danger');
-    return;
-  }
-
-  const currentPermissions = user.permissions || DEFAULT_PERMISSIONS[user.role] || [];
-  const allPermissions = Object.values(PERMISSIONS);
-  
-  // Group permissions by category
-  const permissionGroups = {
-    'User Management': ['manage_users', 'view_users', 'delete_users', 'edit_user_roles'],
-    'Member Management': ['manage_members', 'view_members', 'delete_members'],
-    'Meeting Management': ['manage_meetings', 'view_meetings', 'delete_meetings', 'schedule_meetings'],
-    'Minutes Management': ['manage_minutes', 'view_minutes', 'upload_minutes', 'delete_minutes'],
-    'Complaint Management': ['manage_complaints', 'view_complaints', 'resolve_complaints', 'assign_complaints', 'submit_complaints'],
-    'Document Management': ['manage_documents', 'view_documents', 'upload_documents', 'delete_documents'],
-    'Email & Broadcast': ['send_emails', 'view_emails', 'send_broadcasts', 'delete_broadcasts'],
-    'Approvals': ['approve_users', 'reject_users', 'view_approvals'],
-    'System': ['view_system', 'manage_permissions', 'view_permissions'],
-    'Other': ['track_users', 'generate_qr', 'scan_qr']
-  };
-
-  // Create readable labels for permissions
-  const permissionLabels = {
-    'manage_users': 'Manage Users (Create/Edit)',
-    'view_users': 'View Users',
-    'delete_users': 'Delete Users',
-    'edit_user_roles': 'Edit User Roles',
-    'manage_members': 'Manage Members',
-    'view_members': 'View Members',
-    'delete_members': 'Delete Members',
-    'manage_meetings': 'Manage Meetings',
-    'view_meetings': 'View Meetings',
-    'delete_meetings': 'Delete Meetings',
-    'schedule_meetings': 'Schedule Meetings',
-    'manage_minutes': 'Manage Minutes',
-    'view_minutes': 'View Minutes',
-    'upload_minutes': 'Upload Minutes',
-    'delete_minutes': 'Delete Minutes',
-    'manage_complaints': 'Manage Complaints',
-    'view_complaints': 'View Complaints',
-    'resolve_complaints': 'Resolve Complaints',
-    'assign_complaints': 'Assign Complaints',
-    'submit_complaints': 'Submit Complaints',
-    'manage_documents': 'Manage Documents',
-    'view_documents': 'View Documents',
-    'upload_documents': 'Upload Documents',
-    'delete_documents': 'Delete Documents',
-    'send_emails': 'Send Emails',
-    'view_emails': 'View Emails',
-    'send_broadcasts': 'Send Broadcasts',
-    'delete_broadcasts': 'Delete Broadcasts',
-    'approve_users': 'Approve Users',
-    'reject_users': 'Reject Users',
-    'view_approvals': 'View Approvals',
-    'view_system': 'View System',
-    'manage_permissions': 'Manage Permissions',
-    'view_permissions': 'View Permissions',
-    'track_users': 'Track Users',
-    'generate_qr': 'Generate QR Codes',
-    'scan_qr': 'Scan QR Codes'
-  };
-
-  const defaultPermissions = DEFAULT_PERMISSIONS[user.role] || [];
-
-  showModal(`
-    <div style="max-height:80vh; overflow-y:auto;">
-      <h3><i class="fas fa-shield-alt" style="color:var(--primary);"></i> Manage Permissions</h3>
-      <div style="background:var(--surface-alt); padding:0.75rem 1rem; border-radius:8px; margin:0.5rem 0 1rem 0;">
-        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-          <div><strong>User:</strong> ${user.name}</div>
-          <div><strong>Role:</strong> <span class="badge badge-info">${getRoleLabel(user.role)}</span></div>
-          <div><strong>Municipality:</strong> ${getMunicipalityLabel(user.municipality)}</div>
-        </div>
-        ${user.role !== 'super_admin' ? `
-          <div style="margin-top:0.5rem; font-size:0.85rem; color:var(--text-muted);">
-            <i class="fas fa-info-circle"></i> 
-            Default permissions for this role are shown in <strong>bold</strong>. 
-            ${user.permissions ? 'Custom permissions override defaults.' : 'Using default permissions.'}
-          </div>
-        ` : `
-          <div style="margin-top:0.5rem; font-size:0.85rem; color:var(--warning);">
-            <i class="fas fa-info-circle"></i> 
-            Super Admin has all permissions by default and cannot be modified.
-          </div>
-        `}
-      </div>
-
-      <form id="permissionsForm">
-        ${user.role !== 'super_admin' ? `
-          <div class="form-group" style="margin-bottom:1.5rem;">
-            <label>
-              <input type="checkbox" id="selectAllPermissions" onchange="toggleAllPermissions()" />
-              <strong>Select All Permissions</strong>
-            </label>
-          </div>
-
-          ${Object.entries(permissionGroups).map(([groupName, groupPermissions]) => `
-            <div style="margin-bottom:1.5rem; border:1px solid var(--border); border-radius:8px; padding:1rem;">
-              <div style="font-weight:600; margin-bottom:0.75rem; color:var(--primary);">
-                <i class="fas fa-folder-open"></i> ${groupName}
-              </div>
-              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:0.5rem;">
-                ${groupPermissions.map(perm => {
-                  const isDefault = defaultPermissions.includes(perm);
-                  const isChecked = currentPermissions.includes(perm);
-                  const label = permissionLabels[perm] || perm.replace(/_/g, ' ');
-                  return `
-                    <label style="display:flex; align-items:center; gap:0.5rem; padding:0.25rem 0.5rem; border-radius:4px; ${isDefault ? 'background:var(--surface-alt);' : ''} cursor:pointer;">
-                      <input type="checkbox" 
-                             name="permission" 
-                             value="${perm}" 
-                             ${isChecked ? 'checked' : ''}
-                             ${isDefault ? 'data-default="true"' : ''}
-                             onchange="updateSelectAllState()" />
-                      <span style="font-size:0.9rem; ${isDefault ? 'font-weight:600;' : ''}">${label}</span>
-                      ${isDefault ? '<span style="font-size:0.65rem; color:var(--text-muted);">(default)</span>' : ''}
-                    </label>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `).join('')}
-
-          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1rem;">
-            <button type="submit" class="btn btn-primary">
-              <i class="fas fa-save"></i> Save Permissions
-            </button>
-            <button type="button" class="btn btn-outline" onclick="resetUserPermissions(${user.id})">
-              <i class="fas fa-undo"></i> Reset to Default
-            </button>
-            <button type="button" class="btn btn-outline" onclick="closeModal()">
-              <i class="fas fa-times"></i> Cancel
-            </button>
-          </div>
-        ` : `
-          <div style="padding:1rem; text-align:center; color:var(--text-muted);">
-            <i class="fas fa-lock" style="font-size:2rem; display:block; margin-bottom:0.5rem;"></i>
-            <p>Super Admin has full system access. Permissions cannot be modified for this role.</p>
-          </div>
-          <button type="button" class="btn btn-outline" onclick="closeModal()">
-            <i class="fas fa-times"></i> Close
-          </button>
-        `}
-      </form>
-    </div>
-  `);
-
-  if (user.role !== 'super_admin') {
-    byId('permissionsForm').addEventListener('submit', async function(event) {
-      event.preventDefault();
-      
-      const checkboxes = document.querySelectorAll('input[name="permission"]:checked');
-      const selectedPermissions = Array.from(checkboxes).map(cb => cb.value);
-      
-      // Update user with new permissions
-      const updateData = {
-        ...user,
-        permissions: selectedPermissions
-      };
-      
-      try {
-        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updateData)
-        });
-        
-        if (response.ok) {
-          const updatedUser = await response.json();
-          // Update currentUser if it's the same user
-          if (currentUser.id === userId) {
-            currentUser = updatedUser;
-            localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
-          }
-          closeModal();
-          toast('Permissions updated successfully for ' + user.name + ' ✅', 'success');
-          await renderPermissions();
-          // Refresh the sidebar to reflect changes
-          showAppInfo();
-        } else {
-          const error = await response.json();
-          toast('Failed to update permissions: ' + (error.error || 'Unknown error'), 'danger');
-        }
-      } catch (error) {
-        toast('An error occurred while updating permissions', 'danger');
-      }
-    });
-  }
-}
-
-// Toggle all permissions
-function toggleAllPermissions() {
-  const checkboxes = document.querySelectorAll('input[name="permission"]');
-  const selectAll = document.getElementById('selectAllPermissions');
-  checkboxes.forEach(cb => cb.checked = selectAll.checked);
-}
-
-// Update select all state
-function updateSelectAllState() {
-  const checkboxes = document.querySelectorAll('input[name="permission"]');
-  const checked = document.querySelectorAll('input[name="permission"]:checked');
-  const selectAll = document.getElementById('selectAllPermissions');
-  if (selectAll) {
-    selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
-  }
-}
-
-// Reset user permissions to default
-async function resetUserPermissions(userId) {
-  if (!confirm('Reset permissions for this user to their role defaults?')) return;
-  
-  try {
-    const users = await DB.users();
-    const user = users.find(u => u.id === userId);
-    if (!user) {
-      toast('User not found', 'danger');
-      return;
-    }
-    
-    // Don't reset super admin
-    if (user.role === 'super_admin') {
-      toast('Super Admin permissions cannot be reset', 'danger');
-      return;
-    }
-    
-    const defaultPerms = DEFAULT_PERMISSIONS[user.role] || [];
-    
-    const updateData = {
-      ...user,
-      permissions: defaultPerms
-    };
-    
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateData)
-    });
-    
-    if (response.ok) {
-      const updatedUser = await response.json();
-      if (currentUser.id === userId) {
-        currentUser = updatedUser;
-        localStorage.setItem('mbp_session', JSON.stringify({ userId: currentUser.id }));
-      }
-      toast('Permissions reset to default for ' + user.name, 'success');
-      await renderPermissions();
-    } else {
-      const error = await response.json();
-      toast('Failed to reset permissions: ' + (error.error || 'Unknown error'), 'danger');
-    }
-  } catch (error) {
-    toast('An error occurred', 'danger');
-  }
-}
-
-// Reset all permissions to default for all users
-async function resetAllPermissions() {
-  if (!confirm('This will reset ALL users\' permissions to their role defaults. Continue?')) return;
-  
-  try {
-    const users = await DB.users();
-    let updated = 0;
-    
-    for (const user of users) {
-      if (user.role === 'super_admin') continue;
-      
-      const defaultPerms = DEFAULT_PERMISSIONS[user.role] || [];
-      const updateData = {
-        ...user,
-        permissions: defaultPerms
-      };
-      
-      const response = await fetch(`${API_BASE_URL}/users/${user.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updateData)
-      });
-      
-      if (response.ok) {
-        updated++;
-      }
-    }
-    
-    toast(`Reset permissions for ${updated} users successfully ✅`, 'success');
-    await renderPermissions();
-  } catch (error) {
-    toast('An error occurred while resetting permissions', 'danger');
-  }
-}
-
-// Make permission functions globally accessible
-window.renderPermissions = renderPermissions;
-window.editUserPermissions = editUserPermissions;
-window.resetUserPermissions = resetUserPermissions;
-window.resetAllPermissions = resetAllPermissions;
-window.toggleAllPermissions = toggleAllPermissions;
-window.updateSelectAllState = updateSelectAllState;
-
-// ============= UPDATE NAVIGATION WITH PERMISSIONS =============
-
-// Update showAppInfo to use permission checks
-const originalShowAppInfo = showAppInfo;
-showAppInfo = function() {
-  if (originalShowAppInfo) originalShowAppInfo();
-  
-  // Show/hide navigation items based on permissions
-  const navUsers = document.getElementById('navUsers');
-  if (navUsers) {
-    navUsers.style.display = canViewUsers(currentUser) ? 'flex' : 'none';
-  }
-  
-  const navTrack = document.getElementById('navTrack');
-  if (navTrack) {
-    navTrack.style.display = canTrackUsers(currentUser) ? 'flex' : 'none';
-  }
-  
-  const navApprovals = document.getElementById('navApprovals');
-  if (navApprovals) {
-    navApprovals.style.display = canViewApprovals(currentUser) ? 'flex' : 'none';
-  }
-  
-  // Add permissions nav item for super admin
-  const sidebar = document.querySelector('.sidebar');
-  const navPermissions = document.getElementById('navPermissions');
-  if (sidebar) {
-    if (canManagePermissions(currentUser)) {
-      if (!navPermissions) {
-        const systemSection = sidebar.querySelector('.nav-section:last-child');
-        const permissionsItem = document.createElement('div');
-        permissionsItem.className = 'nav-item';
-        permissionsItem.id = 'navPermissions';
-        permissionsItem.dataset.page = 'permissions';
-        permissionsItem.innerHTML = `<i class="fas fa-shield-alt"></i> Permissions <span class="badge badge-info" style="font-size:0.6rem; margin-left:auto;">Admin</span>`;
-        permissionsItem.addEventListener('click', () => navigate('permissions'));
-        if (systemSection) {
-          systemSection.after(permissionsItem);
-        }
-      }
-    } else {
-      if (navPermissions) {
-        navPermissions.remove();
-      }
-    }
-  }
-};
-
-// Update navigate function to handle permissions page
-const originalNavigate = navigate;
-navigate = function(page) {
-  if (page === 'permissions') {
-    renderPermissions();
-    return;
-  }
-  if (originalNavigate) originalNavigate(page);
-};

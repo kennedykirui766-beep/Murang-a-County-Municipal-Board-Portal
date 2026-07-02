@@ -7,6 +7,10 @@ from datetime import datetime, date
 import os
 import json
 
+# --- Import Reports & Audit Modules ---
+from report_routes import reports_bp
+from audit import AuditLogger, get_client_ip
+
 # --- App Configuration ---
 app = Flask(__name__, static_folder='.')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///municipal_board.db'
@@ -17,6 +21,9 @@ CORS(app)
 
 from models import db
 db.init_app(app)
+
+# --- Register Reports Blueprint ---
+app.register_blueprint(reports_bp)
 
 # --- Routes to Serve the Frontend HTML Pages ---
 
@@ -45,6 +52,17 @@ def login():
     user = User.query.filter_by(email=email).first()
     
     if not user:
+        # Log failed login attempt
+        AuditLogger.log_action(
+            user_id=None,
+            user_name='Unknown',
+            user_email=email,
+            action='LOGIN_FAILED',
+            category='Auth',
+            entity_type='user',
+            details={'ip': get_client_ip(), 'reason': 'User not found'},
+            municipality=None
+        )
         return jsonify({'error': 'Invalid email or password'}), 401
     
     # Check password
@@ -54,6 +72,18 @@ def login():
         return jsonify({'error': 'Login error. Please try again.'}), 500
     
     if not is_valid:
+        # Log failed login attempt
+        AuditLogger.log_action(
+            user_id=user.id,
+            user_name=user.name,
+            user_email=user.email,
+            action='LOGIN_FAILED',
+            category='Auth',
+            entity_type='user',
+            entity_id=user.id,
+            details={'ip': get_client_ip(), 'reason': 'Invalid password'},
+            municipality=user.municipality
+        )
         return jsonify({'error': 'Invalid email or password'}), 401
     
     # Only check approval for members
@@ -65,8 +95,33 @@ def login():
     
     user.last_seen = datetime.utcnow().isoformat()
     db.session.commit()
-    return jsonify(user.to_dict()), 200
     
+    # Log successful login
+    AuditLogger.log_action(
+        user_id=user.id,
+        user_name=user.name,
+        user_email=user.email,
+        action='LOGIN',
+        category='Auth',
+        entity_type='user',
+        entity_id=user.id,
+        details={'ip': get_client_ip()},
+        municipality=user.municipality
+    )
+    
+    AuditLogger.log_system_activity(
+        user_id=user.id,
+        user_name=user.name,
+        activity_type='user_login',
+        description=f'User {user.name} logged in',
+        entity_type='user',
+        entity_id=user.id,
+        municipality=user.municipality
+    )
+    
+    return jsonify(user.to_dict()), 200
+
+
 @app.route('/api/oauth-login', methods=['POST'])
 def oauth_login():
     from models import User, Member
@@ -110,6 +165,19 @@ def oauth_login():
         )
         db.session.add(new_member)
         db.session.commit()
+        
+        # Log OAuth registration
+        AuditLogger.log_action(
+            user_id=user.id,
+            user_name=user.name,
+            user_email=user.email,
+            action='CREATE',
+            category='Auth',
+            entity_type='user',
+            entity_id=user.id,
+            details={'provider': provider, 'ip': get_client_ip()},
+            municipality=user.municipality
+        )
     else:
         if user.role == 'member' and not user.is_approved:
             return jsonify({'error': 'Account pending approval. Please wait for admin approval.'}), 403
@@ -118,8 +186,22 @@ def oauth_login():
         user.last_seen = datetime.utcnow().isoformat()
         db.session.commit()
         
-    return jsonify(user.to_dict()), 200    
-    
+        # Log OAuth login
+        AuditLogger.log_action(
+            user_id=user.id,
+            user_name=user.name,
+            user_email=user.email,
+            action='LOGIN',
+            category='Auth',
+            entity_type='user',
+            entity_id=user.id,
+            details={'provider': provider, 'ip': get_client_ip()},
+            municipality=user.municipality
+        )
+        
+    return jsonify(user.to_dict()), 200
+
+
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
     from models import User
@@ -132,7 +214,7 @@ def heartbeat():
         user.last_seen = datetime.utcnow().isoformat()
         db.session.commit()
         return jsonify({'status': 'success'}), 200
-    return jsonify({'error': 'User not found'}), 404    
+    return jsonify({'error': 'User not found'}), 404
 
 
 @app.route('/api/register', methods=['POST'])
@@ -186,10 +268,35 @@ def register():
     
     try:
         db.session.commit()
+        
+        # Log registration
+        AuditLogger.log_action(
+            user_id=new_user.id,
+            user_name=new_user.name,
+            user_email=new_user.email,
+            action='CREATE',
+            category='Auth',
+            entity_type='user',
+            entity_id=new_user.id,
+            details={'ip': get_client_ip(), 'role': role, 'municipality': municipality},
+            municipality=municipality
+        )
+        
+        AuditLogger.log_system_activity(
+            user_id=new_user.id,
+            user_name=new_user.name,
+            activity_type='user_registered',
+            description=f'New user {new_user.name} registered',
+            entity_type='user',
+            entity_id=new_user.id,
+            municipality=municipality
+        )
+        
         return jsonify(new_user.to_dict()), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Registration failed. Please try again.'}), 500
+
 
 @app.route('/api/reset-password/<int:user_id>', methods=['POST'])
 def reset_password(user_id):
@@ -206,11 +313,25 @@ def reset_password(user_id):
     user.password = generate_password_hash(new_password)
     db.session.commit()
     
+    # Log password reset
+    AuditLogger.log_action(
+        user_id=user.id,
+        user_name=user.name,
+        user_email=user.email,
+        action='UPDATE',
+        category='Auth',
+        entity_type='user',
+        entity_id=user.id,
+        details={'action': 'password_reset', 'ip': get_client_ip()},
+        municipality=user.municipality
+    )
+    
     return jsonify({
         'success': True,
         'email': user.email,
         'message': 'Password reset successfully'
     })
+
 
 def get_model(entity_name):
     from models import User, Member, Meeting, Complaint, Minute, Document, Email, Broadcast
@@ -225,13 +346,35 @@ def get_model(entity_name):
         'broadcasts': Broadcast  
     }.get(entity_name)
 
+
 @app.route('/api/<entity>', methods=['GET'])
 def get_entity(entity):
     Model = get_model(entity)
     if not Model: 
         return jsonify([]), 404
     items = Model.query.all()
+    
+    # Log view action for important entities
+    if entity in ['users', 'meetings', 'complaints', 'minutes', 'documents']:
+        try:
+            # Try to get user from request (simplified - you may want proper auth)
+            user_id = request.args.get('user_id', 1)
+            user = User.query.get(user_id)
+            if user:
+                AuditLogger.log_action(
+                    user_id=user.id,
+                    user_name=user.name,
+                    user_email=user.email,
+                    action='VIEW',
+                    category=entity.capitalize(),
+                    entity_type=entity[:-1] if entity.endswith('s') else entity,
+                    municipality=user.municipality
+                )
+        except:
+            pass
+    
     return jsonify([item.to_dict() for item in items]), 200
+
 
 @app.route('/api/<entity>', methods=['POST'])
 def add_entity_item(entity):
@@ -240,6 +383,10 @@ def add_entity_item(entity):
         return jsonify({'error': 'Entity not found'}), 404
     
     data = request.json
+    
+    # Try to get current user
+    current_user = None
+    current_user_id = data.get('user_id') or data.get('created_by') or 1
     
     if entity == 'users':
         if 'password' in data and data['password']:
@@ -342,7 +489,68 @@ def add_entity_item(entity):
     db.session.add(new_item)
     db.session.commit()
     
+    # Log the creation
+    try:
+        user_name = data.get('name') or data.get('submittedBy') or data.get('uploadedBy') or data.get('sender') or 'System'
+        user_email = data.get('email') or data.get('sender') or ''
+        
+        category_map = {
+            'users': 'Users',
+            'members': 'Members',
+            'meetings': 'Meetings',
+            'complaints': 'Complaints',
+            'minutes': 'Minutes',
+            'documents': 'Documents',
+            'emails': 'Emails',
+            'broadcasts': 'Broadcasts'
+        }
+        
+        entity_type_map = {
+            'users': 'user',
+            'members': 'member',
+            'meetings': 'meeting',
+            'complaints': 'complaint',
+            'minutes': 'minute',
+            'documents': 'document',
+            'emails': 'email',
+            'broadcasts': 'broadcast'
+        }
+        
+        # Log the action
+        AuditLogger.log_action(
+            user_id=current_user_id,
+            user_name=user_name,
+            user_email=user_email,
+            action='CREATE',
+            category=category_map.get(entity, 'System'),
+            entity_type=entity_type_map.get(entity, entity),
+            entity_id=new_item.id if hasattr(new_item, 'id') else None,
+            details={'entity': entity, 'data': {k: v for k, v in data.items() if k not in ['password']}},
+            municipality=data.get('municipality')
+        )
+        
+        # Log system activity for important events
+        if entity in ['meetings', 'complaints', 'users']:
+            description_map = {
+                'meetings': f'Meeting "{data.get("title", "Untitled")}" created',
+                'complaints': f'Complaint "{data.get("title", "Untitled")}" submitted',
+                'users': f'New user {data.get("name", "Unknown")} created'
+            }
+            AuditLogger.log_system_activity(
+                user_id=current_user_id,
+                user_name=user_name,
+                activity_type=f'{entity[:-1]}_created',
+                description=description_map.get(entity, f'{entity} item created'),
+                entity_type=entity_type_map.get(entity, entity),
+                entity_id=new_item.id if hasattr(new_item, 'id') else None,
+                municipality=data.get('municipality')
+            )
+    except Exception as e:
+        # Don't fail the request if logging fails
+        pass
+    
     return jsonify(new_item.to_dict()), 201
+
 
 @app.route('/api/<entity>/<int:item_id>', methods=['PUT'])
 def update_entity_item(entity, item_id):
@@ -355,6 +563,9 @@ def update_entity_item(entity, item_id):
         return jsonify({'error': 'Item not found'}), 404
 
     updated_data = request.json
+    
+    # Get old data for audit
+    old_data = item.to_dict() if hasattr(item, 'to_dict') else {}
 
     if entity == 'users' and 'password' in updated_data and updated_data['password']:
         password = updated_data['password']
@@ -435,7 +646,51 @@ def update_entity_item(entity, item_id):
             
     db.session.commit()
     
+    # Log the update
+    try:
+        category_map = {
+            'users': 'Users',
+            'members': 'Members',
+            'meetings': 'Meetings',
+            'complaints': 'Complaints',
+            'minutes': 'Minutes',
+            'documents': 'Documents',
+            'emails': 'Emails',
+            'broadcasts': 'Broadcasts'
+        }
+        
+        entity_type_map = {
+            'users': 'user',
+            'members': 'member',
+            'meetings': 'meeting',
+            'complaints': 'complaint',
+            'minutes': 'minute',
+            'documents': 'document',
+            'emails': 'email',
+            'broadcasts': 'broadcast'
+        }
+        
+        user_name = getattr(item, 'name', '') or getattr(item, 'submittedBy', '') or getattr(item, 'uploadedBy', '') or 'System'
+        user_email = getattr(item, 'email', '') or ''
+        user_id_val = getattr(item, 'user_id', 1)
+        
+        AuditLogger.log_action(
+            user_id=user_id_val or 1,
+            user_name=user_name,
+            user_email=user_email,
+            action='UPDATE',
+            category=category_map.get(entity, 'System'),
+            entity_type=entity_type_map.get(entity, entity),
+            entity_id=item_id,
+            details={'old': old_data, 'new': updated_data},
+            municipality=getattr(item, 'municipality', None)
+        )
+    except Exception as e:
+        # Don't fail the request if logging fails
+        pass
+    
     return jsonify(item.to_dict()), 200
+
 
 @app.route('/api/<entity>/<int:item_id>', methods=['DELETE'])
 def delete_entity_item(entity, item_id):
@@ -446,11 +701,58 @@ def delete_entity_item(entity, item_id):
     item = Model.query.get(item_id)
     if not item:
         return jsonify({'error': 'Item not found'}), 404
-        
+    
+    # Store item data before deletion for audit
+    item_data = item.to_dict() if hasattr(item, 'to_dict') else {'id': item_id}
+    
     db.session.delete(item)
     db.session.commit()
     
+    # Log the deletion
+    try:
+        category_map = {
+            'users': 'Users',
+            'members': 'Members',
+            'meetings': 'Meetings',
+            'complaints': 'Complaints',
+            'minutes': 'Minutes',
+            'documents': 'Documents',
+            'emails': 'Emails',
+            'broadcasts': 'Broadcasts'
+        }
+        
+        entity_type_map = {
+            'users': 'user',
+            'members': 'member',
+            'meetings': 'meeting',
+            'complaints': 'complaint',
+            'minutes': 'minute',
+            'documents': 'document',
+            'emails': 'email',
+            'broadcasts': 'broadcast'
+        }
+        
+        user_name = item_data.get('name', '') or item_data.get('submittedBy', '') or item_data.get('uploadedBy', '') or item_data.get('sender', '') or 'System'
+        user_email = item_data.get('email', '') or ''
+        user_id_val = item_data.get('user_id', 1)
+        
+        AuditLogger.log_action(
+            user_id=user_id_val or 1,
+            user_name=user_name,
+            user_email=user_email,
+            action='DELETE',
+            category=category_map.get(entity, 'System'),
+            entity_type=entity_type_map.get(entity, entity),
+            entity_id=item_id,
+            details={'deleted_item': item_data},
+            municipality=item_data.get('municipality')
+        )
+    except Exception as e:
+        # Don't fail the request if logging fails
+        pass
+    
     return jsonify({'message': 'Item deleted successfully'}), 200
+
 
 @app.route('/api/<entity>', methods=['PUT'])
 def replace_entity_list(entity):
@@ -459,6 +761,9 @@ def replace_entity_list(entity):
         return jsonify({'error': 'Entity not found'}), 404
     
     new_list_data = request.json
+    
+    # Get old count for audit
+    old_count = Model.query.count()
     
     Model.query.delete()
     db.session.commit()
@@ -539,12 +844,29 @@ def replace_entity_list(entity):
     db.session.add_all(new_items)
     db.session.commit()
     
+    # Log the bulk replace
+    try:
+        AuditLogger.log_action(
+            user_id=1,  # System user
+            user_name='System',
+            user_email='system@localhost',
+            action='REPLACE',
+            category='System',
+            entity_type=entity,
+            details={'old_count': old_count, 'new_count': len(new_items)},
+            municipality=None
+        )
+    except Exception as e:
+        pass
+    
     return jsonify([item.to_dict() for item in new_items]), 200
+
 
 # --- Catch-all Route for Static Files ---
 @app.route('/<path:path>')
 def serve_static_file(path):
     return send_from_directory('.', path)
+
 
 if __name__ == '__main__':
     print(f"Server running at http://127.0.0.1:5000")

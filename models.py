@@ -194,3 +194,113 @@ class Broadcast(db.Model):
         except:
             d['files'] = []
         return d
+
+
+# ============================================================
+# NEW MODELS FOR REPORTS & AUDIT (FOREIGN KEYS REMOVED)
+# ============================================================
+
+class AuditLog(db.Model):
+    """Model for storing audit logs of user actions"""
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)  # REMOVED: db.ForeignKey('users.id')
+    user_name = db.Column(db.String(100), nullable=False)
+    user_email = db.Column(db.String(100), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # CREATE, UPDATE, DELETE, VIEW, LOGIN, LOGOUT
+    category = db.Column(db.String(50), nullable=False)  # User, Member, Meeting, Minutes, Complaint, Document, Broadcast, Email, System, Reports, Auth
+    entity_type = db.Column(db.String(50), nullable=True)  # The type of entity affected
+    entity_id = db.Column(db.Integer, nullable=True)  # The ID of the entity affected
+    details = db.Column(db.Text, nullable=True)  # JSON string with additional details
+    ip_address = db.Column(db.String(45), nullable=True)  # Client IP address
+    user_agent = db.Column(db.String(255), nullable=True)  # Browser user agent
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    municipality = db.Column(db.String(50), nullable=True)  # Municipality context
+    
+    # REMOVED: user = db.relationship('User', backref='audit_logs', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_name': self.user_name,
+            'user_email': self.user_email,
+            'action': self.action,
+            'category': self.category,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'details': self.details,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'municipality': self.municipality
+        }
+
+
+class Report(db.Model):
+    """Model for storing generated reports"""
+    __tablename__ = 'reports'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    report_name = db.Column(db.String(100), nullable=False)
+    report_type = db.Column(db.String(50), nullable=False)  # audit, summary, custom, complaint, meeting, user_activity
+    generated_by = db.Column(db.Integer, nullable=False)  # REMOVED: db.ForeignKey('users.id')
+    generated_by_name = db.Column(db.String(100), nullable=False)
+    generated_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    start_date = db.Column(db.DateTime, nullable=True)
+    end_date = db.Column(db.DateTime, nullable=True)
+    filters = db.Column(db.Text, nullable=True)  # JSON string of applied filters
+    data = db.Column(db.Text, nullable=True)  # JSON string of report data
+    format = db.Column(db.String(20), default='json')  # json, csv, pdf
+    municipality = db.Column(db.String(50), nullable=True)
+    file_path = db.Column(db.String(255), nullable=True)  # Path to stored file if any
+    
+    # REMOVED: user = db.relationship('User', backref='generated_reports', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'report_name': self.report_name,
+            'report_type': self.report_type,
+            'generated_by': self.generated_by,
+            'generated_by_name': self.generated_by_name,
+            'generated_date': self.generated_date.isoformat() if self.generated_date else None,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'filters': self.filters,
+            'data': self.data,
+            'format': self.format,
+            'municipality': self.municipality,
+            'file_path': self.file_path
+        }
+
+
+class SystemActivity(db.Model):
+    """Model for tracking system-wide activities for the activity feed"""
+    __tablename__ = 'system_activities'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True)  # REMOVED: db.ForeignKey('users.id')
+    user_name = db.Column(db.String(100), nullable=True)
+    activity_type = db.Column(db.String(50), nullable=False)  # login, logout, meeting_created, complaint_submitted, etc.
+    description = db.Column(db.Text, nullable=False)
+    entity_type = db.Column(db.String(50), nullable=True)  # meeting, complaint, user, etc.
+    entity_id = db.Column(db.Integer, nullable=True)
+    municipality = db.Column(db.String(50), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # REMOVED: user = db.relationship('User', backref='activities', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_name': self.user_name,
+            'activity_type': self.activity_type,
+            'description': self.description,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'municipality': self.municipality,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
