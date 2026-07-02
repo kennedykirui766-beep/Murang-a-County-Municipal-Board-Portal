@@ -641,72 +641,183 @@ async function renderDashboard() {
   const meetings = getAllowedItems(await DB.meetings());
   const complaints = getAllowedItems(await DB.complaints());
   const minutes = getAllowedItems(await DB.minutes());
-  const broadcasts = getAllowedItems(await DB.broadcasts());
+  const documents = getAllowedItems(await DB.documents());
   const pending = complaints.filter(c => c.status === 'pending').length;
   const resolved = complaints.filter(c => c.status === 'resolved').length;
   
-  const latestBroadcasts = broadcasts
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  // Sort meetings by date for recent list
+  const sortedMeetings = [...meetings].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const recentMeetings = sortedMeetings.slice(0, 4);
+  
+  // Upcoming meetings
+  const upcomingMeetings = meetings
+    .filter(m => new Date(m.date) >= new Date())
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, 3);
   
+  // Wrap everything in dashboard-bg container
   render(`
-    <div class="page-header">
-      <h2><i class="fas fa-chart-pie"></i> Dashboard</h2>
-      <span>${getMunicipalityLabel(currentUser.municipality === 'all' ? 'all' : currentUser.municipality)}</span>
-    </div>
-    
-    ${latestBroadcasts.length ? `
-      <div class="card" style="background:linear-gradient(135deg, var(--surface-alt), var(--surface));border:2px solid var(--primary-light);">
-        <div class="card-title" style="color:var(--primary-dark);">
-          <i class="fas fa-bullhorn"></i> Announcements
-        </div>
-        ${latestBroadcasts.map(b => `
-          <div style="padding:0.75rem;border-bottom:1px solid var(--border);last-child:border-bottom:none;">
-            <div style="display:flex;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
-              <strong>${b.message}</strong>
-              <span style="color:var(--text-muted);font-size:0.85rem;">${formatDate(b.timestamp)}</span>
+    <div class="dashboard-bg">
+      <!-- Welcome Banner -->
+      <div class="dashboard-welcome">
+        <div class="welcome-content">
+          <h1>Welcome back, ${currentUser.name}</h1>
+          <p>Here's what's happening with the board today.</p>
+          <div class="welcome-stats">
+            <div class="stat-item">
+              <span class="stat-number">${members.length}</span>
+              <span class="stat-label">Board Members</span>
             </div>
-            <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem;">
-              — ${b.sender}
+            <div class="stat-item">
+              <span class="stat-number">${meetings.length}</span>
+              <span class="stat-label">Total Meetings</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">${complaints.length}</span>
+              <span class="stat-label">Complaints</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number">${pending}</span>
+              <span class="stat-label">Pending</span>
             </div>
           </div>
-        `).join('')}
-        ${broadcasts.length > 3 ? `<div style="text-align:center;margin-top:0.5rem;">
-          <button class="btn btn-outline btn-sm" onclick="navigate('broadcasts')">
-            View All Announcements
-          </button>
-        </div>` : ''}
+        </div>
       </div>
-    ` : ''}
-    
-    <div class="grid-3">
-      <div class="stat-card"><div class="num">${members.length}</div><div class="label">Board Members</div></div>
-      <div class="stat-card"><div class="num">${meetings.length}</div><div class="label">Meetings</div></div>
-      <div class="stat-card"><div class="num">${complaints.length}</div><div class="label">Complaints</div></div>
-      <div class="stat-card"><div class="num">${pending}</div><div class="label">Pending</div></div>
-      <div class="stat-card"><div class="num">${resolved}</div><div class="label">Resolved</div></div>
-      <div class="stat-card"><div class="num">${minutes.length}</div><div class="label">Minutes</div></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><i class="fas fa-bolt"></i> Quick Actions</div>
-      <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
-        <button class="btn btn-primary btn-sm" onclick="navigate('members')"><i class="fas fa-users"></i> Members</button>
-        <button class="btn btn-primary btn-sm" onclick="navigate('meetings')"><i class="fas fa-calendar-alt"></i> Meetings</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('complaints')"><i class="fas fa-exclamation-triangle"></i> Complaints</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('documents')"><i class="fas fa-folder-open"></i> Documents</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('emails')"><i class="fas fa-envelope"></i> Email</button>
+
+      <!-- Stat Cards -->
+      <div class="stat-grid">
+        <div class="stat-card-modern">
+          <div class="stat-icon green"><i class="fas fa-users"></i></div>
+          <div class="stat-number">${members.length}</div>
+          <div class="stat-label">Board Members</div>
+          <div class="stat-change positive"><i class="fas fa-arrow-up"></i> Active</div>
+        </div>
+        <div class="stat-card-modern">
+          <div class="stat-icon gold"><i class="fas fa-calendar-alt"></i></div>
+          <div class="stat-number">${meetings.length}</div>
+          <div class="stat-label">Meetings</div>
+          <div class="stat-change positive"><i class="fas fa-arrow-up"></i> Scheduled</div>
+        </div>
+        <div class="stat-card-modern">
+          <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+          <div class="stat-number">${complaints.length}</div>
+          <div class="stat-label">Complaints</div>
+          <div class="stat-change ${pending > 0 ? 'negative' : 'positive'}">${pending} Pending</div>
+        </div>
+        <div class="stat-card-modern">
+          <div class="stat-icon purple"><i class="fas fa-file-alt"></i></div>
+          <div class="stat-number">${minutes.length}</div>
+          <div class="stat-label">Minutes</div>
+          <div class="stat-change positive"><i class="fas fa-arrow-up"></i> Uploaded</div>
+        </div>
+        <div class="stat-card-modern">
+          <div class="stat-icon blue"><i class="fas fa-folder-open"></i></div>
+          <div class="stat-number">${documents.length}</div>
+          <div class="stat-label">Documents</div>
+          <div class="stat-change positive"><i class="fas fa-arrow-up"></i> Available</div>
+        </div>
+        <div class="stat-card-modern">
+          <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+          <div class="stat-number">${resolved}</div>
+          <div class="stat-label">Resolved</div>
+          <div class="stat-change positive"><i class="fas fa-arrow-up"></i> Completed</div>
+        </div>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-title"><i class="fas fa-clock"></i> Recent Activity</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Activity</th><th>Municipality</th><th>Date</th></tr></thead>
-          <tbody>
-            ${meetings.slice(0, 3).map(m => `<tr><td>Meeting: ${m.title}</td><td>${getMunicipalityLabel(m.municipality)}</td><td>${formatDate(m.date)}</td></tr>`).join('')}
-            ${complaints.slice(0, 2).map(c => `<tr><td>Complaint: ${c.title}</td><td>${getMunicipalityLabel(c.municipality)}</td><td>${formatDate(c.date)}</td></tr>`).join('')}
-          </tbody>
-        </table>
+
+      <!-- Dashboard Two-Column Grid -->
+      <div class="dashboard-grid">
+        <!-- Left Column - Recent Activity -->
+        <div class="card">
+          <div class="card-header-modern">
+            <div class="card-title"><i class="fas fa-clock"></i> Recent Meetings</div>
+            <span class="card-action" onclick="navigate('meetings')">View All →</span>
+          </div>
+          <div class="activity-list">
+            ${recentMeetings.length ? recentMeetings.map(m => `
+              <div class="activity-item">
+                <div class="activity-icon meeting"><i class="fas fa-calendar-check"></i></div>
+                <div class="activity-content">
+                  <div class="activity-title">${m.title}</div>
+                  <div class="activity-meta">${formatDate(m.date)} at ${m.time} • ${m.location}</div>
+                </div>
+                <div class="activity-time">${m.attendees ? m.attendees.length : 0} attending</div>
+              </div>
+            `).join('') : '<div class="activity-item" style="justify-content:center;color:var(--text-muted);padding:1rem;">No recent meetings</div>'}
+          </div>
+        </div>
+
+        <!-- Right Column - Upcoming Events -->
+        <div class="card">
+          <div class="card-header-modern">
+            <div class="card-title"><i class="fas fa-calendar-alt"></i> Upcoming Events</div>
+            <span class="card-action" onclick="navigate('meetings')">View All →</span>
+          </div>
+          <div class="events-list">
+            ${upcomingMeetings.length ? upcomingMeetings.map(m => {
+              const date = new Date(m.date);
+              return `
+              <div class="event-item">
+                <div class="event-date">
+                  <div class="event-day">${date.getDate()}</div>
+                  <div class="event-month">${date.toLocaleString('default', { month: 'short' })}</div>
+                </div>
+                <div class="event-info">
+                  <div class="event-title">${m.title}</div>
+                  <div class="event-time">${m.time} • ${m.location}</div>
+                </div>
+                <div class="event-badge">Upcoming</div>
+              </div>
+            `}).join('') : '<div class="event-item" style="justify-content:center;color:var(--text-muted);padding:1rem;">No upcoming meetings</div>'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Budget Utilization Card -->
+      <div class="budget-card" style="margin-top:1.25rem;">
+        <div class="budget-header">
+          <div class="budget-title"><i class="fas fa-chart-pie" style="color:var(--primary);margin-right:0.5rem;"></i>Budget Utilization</div>
+          <div class="budget-year">FY 2024/2025</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:0.25rem;">
+          <span>87% Used</span>
+          <span style="color:var(--gold);">23% Remaining</span>
+        </div>
+        <div class="budget-progress">
+          <div class="budget-bar gold" style="width:87%;"></div>
+        </div>
+        <div class="budget-stats">
+          <div class="budget-stat">
+            <div class="stat-value">KES 12.4M</div>
+            <div class="stat-label">Total Budget</div>
+          </div>
+          <div class="budget-stat">
+            <div class="stat-value">KES 10.8M</div>
+            <div class="stat-label">Used</div>
+          </div>
+          <div class="budget-stat">
+            <div class="stat-value">KES 1.6M</div>
+            <div class="stat-label">Remaining</div>
+          </div>
+          <div class="budget-stat">
+            <div class="stat-value" style="color:var(--gold);">87%</div>
+            <div class="stat-label">Utilization</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card" style="margin-top:1.25rem;">
+        <div class="card-header-modern">
+          <div class="card-title"><i class="fas fa-bolt" style="color:var(--gold);"></i> Quick Actions</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+          <button class="btn btn-primary btn-sm" onclick="navigate('members')"><i class="fas fa-users"></i> Members</button>
+          <button class="btn btn-gold btn-sm" onclick="navigate('meetings')"><i class="fas fa-calendar-alt"></i> Schedule Meeting</button>
+          <button class="btn btn-outline btn-sm" onclick="navigate('complaints')"><i class="fas fa-exclamation-triangle"></i> Complaints</button>
+          <button class="btn btn-outline btn-sm" onclick="navigate('documents')"><i class="fas fa-folder-open"></i> Documents</button>
+          <button class="btn btn-outline btn-sm" onclick="navigate('emails')"><i class="fas fa-envelope"></i> Email</button>
+          <button class="btn btn-outline btn-sm" onclick="navigate('broadcasts')"><i class="fas fa-bullhorn"></i> Announce</button>
+        </div>
       </div>
     </div>
   `);

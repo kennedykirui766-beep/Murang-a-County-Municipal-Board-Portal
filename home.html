@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Murang'a County Municipal Board Portal</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
@@ -29,11 +29,20 @@
   </div>
 
   <div id="app" class="active">
+    <!-- Navbar with Hamburger Menu -->
     <nav class="navbar">
       <div class="brand">
         <img src="logo.png" alt="Murang'a County Logo" class="nav-logo" />
         <span>Murang'a Board Portal</span>
       </div>
+      
+      <!-- Mobile Hamburger Button -->
+      <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle Menu">
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+        <span class="hamburger-bar"></span>
+      </button>
+      
       <div class="nav-actions">
         <span class="user-badge"><i class="fas fa-user-circle"></i> <span id="navUserName">User</span> (<span id="navUserRole">role</span>)</span>
         <span class="user-badge" style="background:var(--gray-200);color:var(--gray-700);" id="navMunicipality">Municipality</span>
@@ -42,11 +51,19 @@
     </nav>
 
     <div class="app-body">
+      <!-- Mobile Overlay -->
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+      
+      <!-- Sidebar -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <img src="logo.png" alt="Murang'a County Logo" class="sidebar-logo" />
           <h2>Municipal Board</h2>
           <span class="sidebar-subtitle">Murang'a County</span>
+          <!-- Mobile Close Button -->
+          <button class="sidebar-close-btn" id="sidebarCloseBtn" aria-label="Close Menu">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
         
         <div class="nav-section">Main</div>
@@ -56,7 +73,6 @@
         <div class="nav-item" data-page="minutes"><i class="fas fa-file-alt"></i> Minutes</div>
         <div class="nav-item" data-page="complaints"><i class="fas fa-exclamation-triangle"></i> Complaints</div>
         <div class="nav-item" data-page="documents"><i class="fas fa-folder-open"></i> Documents</div>
-        <div class="nav-item" data-page="projects"><i class="fas fa-project-diagram"></i> Projects</div>
         <div class="nav-item" data-page="emails"><i class="fas fa-envelope"></i> Email</div>
         
         <div class="nav-section">System</div>
@@ -73,7 +89,6 @@
         
         <div class="nav-item" data-page="broadcasts"><i class="fas fa-bullhorn"></i> Announcements</div>
         
-        <!-- REPORTS NAV ITEM -->
         <div class="nav-item" data-page="reports" id="navReports">
           <i class="fas fa-chart-bar"></i> Reports & Audit
           <span class="badge badge-info" style="font-size:0.6rem; margin-left:auto;">New</span>
@@ -83,10 +98,8 @@
       </aside>
 
       <main class="main-content" id="mainContent">
-        <!-- Javascript injects content here -->
         <div id="pageContainer"></div>
         
-        <!-- FINE PRINT FOOTER -->
         <footer style="text-align: center; padding: 1.5rem 1rem; font-size: 0.75rem; color: var(--text-muted, #666); border-top: 1px solid var(--border, #eee); margin-top: 2rem;">
           <p>&copy; <span id="currentYear"></span> Murang'a County Municipal Board. All rights reserved.</p>
           <p>This system contains confidential information intended only for authorized personnel. Unauthorized access, use, or disclosure of information contained in this system is strictly prohibited and a violation of security policies.</p>
@@ -102,99 +115,141 @@
     </div>
   </div>
 
-  <!-- Script to automatically update the year -->
   <script>
-// Contrast toggle function - works independently for light and dark themes
-function toggleContrast() {
-  const html = document.documentElement;
-  const currentContrast = html.getAttribute('data-contrast');
-  const currentTheme = html.getAttribute('data-theme') || 'light';
-  
-  // Toggle contrast on/off
-  const nextContrast = currentContrast === 'high' ? 'normal' : 'high';
-  
-  if (nextContrast === 'high') {
-    html.setAttribute('data-contrast', 'high');
-    localStorage.setItem('mbp_contrast', 'high');
-  } else {
-    html.removeAttribute('data-contrast');
-    localStorage.removeItem('mbp_contrast');
-  }
-  
-  // Update button appearance
-  const btn = document.getElementById('aContrastToggle');
-  if (btn) {
-    if (nextContrast === 'high') {
-      btn.classList.add('active');
-      btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
-      if (currentTheme === 'light') {
-        btn.style.background = 'rgba(0, 0, 0, 0.15)';
-        btn.style.border = '2px solid #000000';
-        btn.style.color = '#000000';
-        btn.querySelector('i').style.color = '#000000';
-      } else {
-        btn.style.background = 'rgba(255, 255, 255, 0.25)';
-        btn.style.border = '2px solid #ffffff';
-        btn.style.color = '#ffffff';
+    // Hamburger Menu Toggle
+    document.addEventListener('DOMContentLoaded', function() {
+      const hamburgerBtn = document.getElementById('hamburgerBtn');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      const closeBtn = document.getElementById('sidebarCloseBtn');
+      
+      function toggleSidebar() {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+        document.body.classList.toggle('sidebar-open');
       }
-    } else {
-      btn.classList.remove('active');
-      btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
-      btn.style.background = '';
-      btn.style.border = '';
-      btn.style.color = '';
-    }
-  }
-  
-  toast(nextContrast === 'high' ? 'High contrast mode enabled' : 'Normal contrast restored', 'info');
-}
-
-// Restore contrast setting on page load
-document.addEventListener('DOMContentLoaded', function() {
-  const savedContrast = localStorage.getItem('mbp_contrast');
-  const btn = document.getElementById('aContrastToggle');
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-  
-  if (savedContrast === 'high') {
-    document.documentElement.setAttribute('data-contrast', 'high');
-    if (btn) {
-      btn.classList.add('active');
-      btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
-      if (currentTheme === 'light') {
-        btn.style.background = 'rgba(0, 0, 0, 0.15)';
-        btn.style.border = '2px solid #000000';
-        btn.style.color = '#000000';
-        btn.querySelector('i').style.color = '#000000';
-      } else {
-        btn.style.background = 'rgba(255, 255, 255, 0.25)';
-        btn.style.border = '2px solid #ffffff';
-        btn.style.color = '#ffffff';
+      
+      function closeSidebar() {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+        document.body.classList.remove('sidebar-open');
       }
-    }
-  }
-  
-  // Bind contrast toggle
-  if (btn) {
-    btn.addEventListener('click', toggleContrast);
-  }
-});
+      
+      if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', toggleSidebar);
+      }
+      
+      if (closeBtn) {
+        closeBtn.addEventListener('click', closeSidebar);
+      }
+      
+      if (overlay) {
+        overlay.addEventListener('click', closeSidebar);
+      }
+      
+      // Close sidebar when a nav item is clicked (mobile)
+      document.querySelectorAll('.sidebar .nav-item, .sidebar a.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+          if (window.innerWidth <= 980) {
+            closeSidebar();
+          }
+        });
+      });
+      
+      // Close sidebar on escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('active')) {
+          closeSidebar();
+        }
+      });
+    });
 
-// Override reset to clear contrast
-const originalReset = window.resetAccessibility;
-window.resetAccessibility = function() {
-  if (originalReset) originalReset();
-  document.documentElement.removeAttribute('data-contrast');
-  localStorage.removeItem('mbp_contrast');
-  const btn = document.getElementById('aContrastToggle');
-  if (btn) {
-    btn.classList.remove('active');
-    btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
-    btn.style.background = '';
-    btn.style.border = '';
-    btn.style.color = '';
-  }
-  toast('All accessibility settings reset', 'info');
-};
+    // Contrast toggle function
+    function toggleContrast() {
+      const html = document.documentElement;
+      const currentContrast = html.getAttribute('data-contrast');
+      const currentTheme = html.getAttribute('data-theme') || 'light';
+      
+      const nextContrast = currentContrast === 'high' ? 'normal' : 'high';
+      
+      if (nextContrast === 'high') {
+        html.setAttribute('data-contrast', 'high');
+        localStorage.setItem('mbp_contrast', 'high');
+      } else {
+        html.removeAttribute('data-contrast');
+        localStorage.removeItem('mbp_contrast');
+      }
+      
+      const btn = document.getElementById('aContrastToggle');
+      if (btn) {
+        if (nextContrast === 'high') {
+          btn.classList.add('active');
+          btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
+          if (currentTheme === 'light') {
+            btn.style.background = 'rgba(0, 0, 0, 0.15)';
+            btn.style.border = '2px solid #000000';
+            btn.style.color = '#000000';
+            btn.querySelector('i').style.color = '#000000';
+          } else {
+            btn.style.background = 'rgba(255, 255, 255, 0.25)';
+            btn.style.border = '2px solid #ffffff';
+            btn.style.color = '#ffffff';
+          }
+        } else {
+          btn.classList.remove('active');
+          btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
+          btn.style.background = '';
+          btn.style.border = '';
+          btn.style.color = '';
+        }
+      }
+      
+      toast(nextContrast === 'high' ? 'High contrast mode enabled' : 'Normal contrast restored', 'info');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedContrast = localStorage.getItem('mbp_contrast');
+      const btn = document.getElementById('aContrastToggle');
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      
+      if (savedContrast === 'high') {
+        document.documentElement.setAttribute('data-contrast', 'high');
+        if (btn) {
+          btn.classList.add('active');
+          btn.innerHTML = '<i class="fas fa-circle" style="color:#ffffff;text-shadow:0 0 4px currentColor;"></i> Contrast ON';
+          if (currentTheme === 'light') {
+            btn.style.background = 'rgba(0, 0, 0, 0.15)';
+            btn.style.border = '2px solid #000000';
+            btn.style.color = '#000000';
+            btn.querySelector('i').style.color = '#000000';
+          } else {
+            btn.style.background = 'rgba(255, 255, 255, 0.25)';
+            btn.style.border = '2px solid #ffffff';
+            btn.style.color = '#ffffff';
+          }
+        }
+      }
+      
+      if (btn) {
+        btn.addEventListener('click', toggleContrast);
+      }
+    });
+
+    const originalReset = window.resetAccessibility;
+    window.resetAccessibility = function() {
+      if (originalReset) originalReset();
+      document.documentElement.removeAttribute('data-contrast');
+      localStorage.removeItem('mbp_contrast');
+      const btn = document.getElementById('aContrastToggle');
+      if (btn) {
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-circle"></i> Contrast';
+        btn.style.background = '';
+        btn.style.border = '';
+        btn.style.color = '';
+      }
+      toast('All accessibility settings reset', 'info');
+    };
   </script>
 
   <script src="app_backend.js"></script>
