@@ -4870,7 +4870,6 @@ body {
 }
 
 /* --- Responsive Breakpoints --- */
-
 /* Mobile devices */
 @media (max-width: 980px) {
   /* Show hamburger button on left */
@@ -4891,30 +4890,33 @@ body {
     top: 30px;
   }
   
-  /* Accessibility bar - even smaller on mobile */
+  /* Accessibility bar - BIGGER on mobile */
   .accessibility-bar {
-    padding: 0.15rem 0.4rem;
-    gap: 0.15rem;
-    min-height: 28px;
+    padding: 0.4rem 0.8rem;
+    gap: 0.4rem;
+    min-height: 44px;
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
   }
   
   .accessibility-bar .label {
-    font-size: 0.5rem;
-    margin-right: 0.15rem;
+    font-size: 0.75rem;
+    margin-right: 0.3rem;
+    font-weight: 700;
   }
   
   .accessibility-bar button {
-    padding: 0.12rem 0.3rem;
-    font-size: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
     white-space: nowrap;
     border-radius: 999px;
+    min-height: 32px;
+    font-weight: 600;
   }
   
   .accessibility-bar button i {
-    font-size: 0.5rem;
+    font-size: 0.75rem;
   }
   
   /* Brand on mobile */
@@ -5011,23 +5013,27 @@ body {
     top: 26px;
   }
   
+  /* Accessibility bar - BIGGER on small phones */
   .accessibility-bar {
-    padding: 0.1rem 0.25rem;
-    min-height: 24px;
-    gap: 0.1rem;
+    padding: 0.35rem 0.6rem;
+    min-height: 40px;
+    gap: 0.3rem;
   }
   
   .accessibility-bar .label {
-    font-size: 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 700;
   }
   
   .accessibility-bar button {
-    padding: 0.08rem 0.2rem;
-    font-size: 0.45rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.65rem;
+    min-height: 28px;
+    font-weight: 600;
   }
   
   .accessibility-bar button i {
-    font-size: 0.45rem;
+    font-size: 0.65rem;
   }
   
   .hamburger-btn {
@@ -5107,13 +5113,27 @@ body {
     height: 18px;
   }
   
-  .accessibility-bar button {
-    font-size: 0.4rem;
-    padding: 0.05rem 0.15rem;
+  /* Accessibility bar - BIGGER on very small phones */
+  .accessibility-bar {
+    padding: 0.3rem 0.5rem;
+    min-height: 36px;
+    gap: 0.25rem;
   }
   
   .accessibility-bar .label {
-    font-size: 0.4rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+  }
+  
+  .accessibility-bar button {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.6rem;
+    min-height: 26px;
+    font-weight: 600;
+  }
+  
+  .accessibility-bar button i {
+    font-size: 0.6rem;
   }
   
   .sidebar {
@@ -5223,18 +5243,27 @@ body {
     padding: 0.4rem 1.5rem;
   }
   
+  /* Accessibility bar - BIGGER on desktop */
   .accessibility-bar {
-    min-height: 30px;
-    padding: 0.15rem 1rem;
+    min-height: 48px;
+    padding: 0.5rem 1.5rem;
+    gap: 0.5rem;
   }
   
   .accessibility-bar .label {
-    font-size: 0.7rem;
+    font-size: 0.9rem;
+    font-weight: 700;
   }
   
   .accessibility-bar button {
-    padding: 0.15rem 0.5rem;
-    font-size: 0.6rem;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    min-height: 38px;
+    font-weight: 600;
+  }
+  
+  .accessibility-bar button i {
+    font-size: 0.9rem;
   }
   
   .navbar .brand {
