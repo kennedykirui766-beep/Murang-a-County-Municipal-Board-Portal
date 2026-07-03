@@ -6295,9 +6295,9 @@ async function renderPermissions() {
     </div>
   `);
 }
+
 // ============= REPORTS & AUDIT SECTION =============
 
-// Generate summary statistics for reports from API data
 function generateReportSummaryFromAPI(stats) {
   return {
     totalUsers: stats.users_count || 0,
@@ -6319,9 +6319,7 @@ function generateReportSummaryFromAPI(stats) {
   };
 }
 
-// Render Reports Page
 async function renderReports() {
-  // Check permission - only admins and municipal officers can view reports
   if (!isSystemAdmin(currentUser) && currentUser.role !== 'municipal_officer') {
     render(`
       <div class="card" style="text-align:center; padding:3rem;">
@@ -6333,11 +6331,13 @@ async function renderReports() {
     return;
   }
 
-  // Show loading state
   render(`
     <div class="page-header">
       <h2><i class="fas fa-chart-bar"></i> Reports & Audit</h2>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button class="btn btn-success btn-sm" onclick="showExportModal()">
+          <i class="fas fa-file-export"></i> Export
+        </button>
         <button class="btn btn-outline btn-sm" onclick="refreshReports()">
           <i class="fas fa-sync"></i> Refresh
         </button>
@@ -6350,22 +6350,16 @@ async function renderReports() {
   `);
 
   try {
-    // Fetch dashboard stats from the API
     const response = await fetch(`${API_BASE_URL}/reports/dashboard-stats?user_id=${currentUser.id}`);
     const stats = await response.json();
-    
-    // Generate summary from API stats
     const summary = generateReportSummaryFromAPI(stats);
 
     render(`
       <div class="page-header">
         <h2><i class="fas fa-chart-bar"></i> Reports & Audit</h2>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn btn-success btn-sm" onclick="exportReportCSV()">
-            <i class="fas fa-file-csv"></i> Export CSV
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="exportReportPDF()">
-            <i class="fas fa-file-pdf"></i> Export PDF
+          <button class="btn btn-success btn-sm" onclick="showExportModal()">
+            <i class="fas fa-file-export"></i> Export
           </button>
           <button class="btn btn-outline btn-sm" onclick="refreshReports()">
             <i class="fas fa-sync"></i> Refresh
@@ -6373,7 +6367,6 @@ async function renderReports() {
         </div>
       </div>
 
-      <!-- Summary Statistics -->
       <div class="grid-3" style="margin-bottom:1.5rem;">
         <div class="stat-card" style="border-left-color: #2563eb;">
           <div class="num">${summary.totalUsers}</div>
@@ -6402,7 +6395,6 @@ async function renderReports() {
         </div>
       </div>
 
-      <!-- Audit Log Table -->
       <div class="card table-wrap">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
           <span><i class="fas fa-history"></i> Audit Log</span>
@@ -6435,7 +6427,6 @@ async function renderReports() {
         </div>
       </div>
 
-      <!-- Recent Activities -->
       <div class="card">
         <div class="card-title"><i class="fas fa-clock"></i> Recent Activity</div>
         ${stats.recent_activities && stats.recent_activities.length > 0 ? 
@@ -6467,7 +6458,376 @@ async function renderReports() {
   }
 }
 
-// Load audit logs from API
+// ============= EXPORT MODAL WITH DATE FILTER =============
+
+function showExportModal() {
+  const now = new Date();
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  showModal(`
+    <div style="max-width:520px; margin:0 auto; padding:0.25rem;">
+      <h3 style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.5rem; color:var(--text);">
+        <i class="fas fa-file-export" style="color:var(--primary);"></i>
+        Export Reports
+      </h3>
+      <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1.5rem;">
+        Select a date range and export format for your report data.
+      </p>
+      
+      <form id="exportForm">
+        <!-- Date Range -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="exportStartDate" style="font-weight:500; display:block; margin-bottom:0.3rem; color:var(--text);">
+              <i class="fas fa-calendar-start" style="color:var(--primary);"></i> From
+            </label>
+            <input type="date" id="exportStartDate" value="${formatDateForInput(oneMonthAgo)}" 
+                   style="width:100%; padding:0.6rem 0.8rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:0.9rem;" />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label for="exportEndDate" style="font-weight:500; display:block; margin-bottom:0.3rem; color:var(--text);">
+              <i class="fas fa-calendar-end" style="color:var(--primary);"></i> To
+            </label>
+            <input type="date" id="exportEndDate" value="${formatDateForInput(now)}" 
+                   style="width:100%; padding:0.6rem 0.8rem; border:2px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-size:0.9rem;" />
+          </div>
+        </div>
+        
+        <!-- Quick Date Range Buttons -->
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+          <button type="button" class="btn btn-sm btn-outline" onclick="setExportDateRange(7)">
+            <i class="fas fa-clock"></i> Last 7 days
+          </button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setExportDateRange(30)">
+            <i class="fas fa-clock"></i> Last 30 days
+          </button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setExportDateRange(90)">
+            <i class="fas fa-clock"></i> Last 90 days
+          </button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setExportDateRange(365)">
+            <i class="fas fa-clock"></i> Last year
+          </button>
+        </div>
+        
+        <!-- Export Format Selection -->
+        <div class="form-group" style="margin-bottom:1.5rem;">
+          <label style="font-weight:500; display:block; margin-bottom:0.3rem; color:var(--text);">
+            <i class="fas fa-file-format" style="color:var(--primary);"></i> Export Format
+          </label>
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.2s; background:var(--surface);"
+                   onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface-alt)';" 
+                   onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface)';">
+              <input type="radio" name="exportFormat" value="csv" checked />
+              <i class="fas fa-file-csv" style="color:#2ea043;"></i> CSV
+            </label>
+            <label style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.2s; background:var(--surface);"
+                   onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface-alt)';" 
+                   onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface)';">
+              <input type="radio" name="exportFormat" value="pdf" />
+              <i class="fas fa-file-pdf" style="color:#dc2626;"></i> PDF
+            </label>
+            <label style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem 1rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.2s; background:var(--surface);"
+                   onmouseover="this.style.borderColor='var(--primary)'; this.style.background='var(--surface-alt)';" 
+                   onmouseout="this.style.borderColor='var(--border)'; this.style.background='var(--surface)';">
+              <input type="radio" name="exportFormat" value="json" />
+              <i class="fas fa-code" style="color:#7c3aed;"></i> JSON
+            </label>
+          </div>
+        </div>
+        
+        <!-- Export Options -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.5rem; padding:0.75rem; background:var(--surface-alt); border-radius:8px; border:1px solid var(--border);">
+          <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; cursor:pointer; color:var(--text);">
+            <input type="checkbox" id="exportIncludeAudit" checked style="width:16px; height:16px; accent-color:var(--primary); cursor:pointer;" />
+            <span>Include Audit Logs</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; cursor:pointer; color:var(--text);">
+            <input type="checkbox" id="exportIncludeStats" checked style="width:16px; height:16px; accent-color:var(--primary); cursor:pointer;" />
+            <span>Include Statistics</span>
+          </label>
+        </div>
+        
+        <!-- Action Buttons - IMPROVED STYLING -->
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
+          <button type="submit" class="btn btn-success" style="flex:1; min-width:120px; padding:0.75rem 1.5rem; font-weight:600; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:0.5rem; background:var(--success); color:white; border:none; cursor:pointer; transition:all 0.3s;">
+            <i class="fas fa-download"></i> Export
+          </button>
+          <button type="button" onclick="closeModal()" style="flex:1; min-width:100px; padding:0.75rem 1.5rem; font-weight:600; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:0.5rem; background:var(--surface-alt); color:var(--text); border:2px solid var(--border); cursor:pointer; transition:all 0.3s;"
+                  onmouseover="this.style.background='var(--surface-muted)'; this.style.borderColor='var(--danger)'; this.style.color='var(--danger)';"
+                  onmouseout="this.style.background='var(--surface-alt)'; this.style.borderColor='var(--border)'; this.style.color='var(--text)';">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  `);
+  
+  byId('exportForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    
+    const startDate = byId('exportStartDate').value;
+    const endDate = byId('exportEndDate').value;
+    const format = document.querySelector('input[name="exportFormat"]:checked').value;
+    const includeAudit = byId('exportIncludeAudit').checked;
+    const includeStats = byId('exportIncludeStats').checked;
+    
+    if (!startDate || !endDate) {
+      toast('Please select both start and end dates', 'danger');
+      return;
+    }
+    
+    if (new Date(startDate) > new Date(endDate)) {
+      toast('Start date must be before end date', 'danger');
+      return;
+    }
+    
+    closeModal();
+    toast('Generating export... Please wait.', 'info');
+    
+    try {
+      const exportData = await fetchExportData(startDate, endDate, includeAudit, includeStats);
+      
+      if (format === 'csv') {
+        downloadCSV(exportData, startDate, endDate);
+      } else if (format === 'pdf') {
+        downloadPDF(exportData, startDate, endDate);
+      } else if (format === 'json') {
+        downloadJSON(exportData, startDate, endDate);
+      }
+      
+      toast('Export completed successfully! ✅', 'success');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast('Failed to generate export: ' + error.message, 'danger');
+    }
+  });
+}
+function setExportDateRange(days) {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const startInput = document.getElementById('exportStartDate');
+  const endInput = document.getElementById('exportEndDate');
+  if (startInput) startInput.value = formatDateForInput(startDate);
+  if (endInput) endInput.value = formatDateForInput(endDate);
+}
+
+async function fetchExportData(startDate, endDate, includeAudit, includeStats) {
+  const params = new URLSearchParams({
+    start_date: startDate,
+    end_date: endDate,
+    user_id: currentUser.id
+  });
+  
+  const results = {};
+  
+  if (includeStats) {
+    const statsResponse = await fetch(`${API_BASE_URL}/reports/dashboard-stats?user_id=${currentUser.id}`);
+    if (statsResponse.ok) {
+      results.stats = await statsResponse.json();
+    }
+  }
+  
+  if (includeAudit) {
+    const auditResponse = await fetch(`${API_BASE_URL}/reports/audit/logs?${params.toString()}&per_page=1000`);
+    if (auditResponse.ok) {
+      const auditData = await auditResponse.json();
+      results.auditLogs = auditData.logs || [];
+    }
+  }
+  
+  const summaryResponse = await fetch(`${API_BASE_URL}/reports/summary?${params.toString()}`);
+  if (summaryResponse.ok) {
+    results.summary = await summaryResponse.json();
+  }
+  
+  return results;
+}
+
+function downloadCSV(data, startDate, endDate) {
+  const rows = [];
+  rows.push('Date,User,Action,Category,Details');
+  
+  if (data.auditLogs && data.auditLogs.length > 0) {
+    data.auditLogs.forEach(log => {
+      const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString() : '';
+      const userName = log.user_name || 'System';
+      const action = log.action || '';
+      const category = log.category || '';
+      const details = (log.details || '').replace(/,/g, ';').replace(/\n/g, ' ');
+      rows.push(`${timestamp},"${userName}","${action}","${category}","${details}"`);
+    });
+  }
+  
+  if (data.stats) {
+    rows.push('');
+    rows.push('Summary Statistics');
+    rows.push(`Total Users,${data.stats.users_count || 0}`);
+    rows.push(`Total Meetings,${data.stats.meetings_count || 0}`);
+    rows.push(`Total Complaints,${data.stats.complaints_count || 0}`);
+    rows.push(`Pending Complaints,${data.stats.pending_complaints || 0}`);
+    rows.push(`Resolved Complaints,${data.stats.resolved_complaints || 0}`);
+    rows.push(`Minutes Uploaded,${data.stats.minutes_count || 0}`);
+    rows.push(`Documents,${data.stats.documents_count || 0}`);
+    rows.push(`Announcements,${data.stats.broadcasts_count || 0}`);
+  }
+  
+  const csvContent = rows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `report_${startDate}_to_${endDate}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function downloadPDF(data, startDate, endDate) {
+  const htmlContent = generatePDFHTML(data, startDate, endDate);
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+  setTimeout(() => {
+    printWindow.print();
+  }, 500);
+}
+
+function generatePDFHTML(data, startDate, endDate) {
+  const formattedStart = new Date(startDate).toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+  const formattedEnd = new Date(endDate).toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  let auditRows = '';
+  if (data.auditLogs && data.auditLogs.length > 0) {
+    auditRows = data.auditLogs.map(log => `
+      <tr>
+        <td>${log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}</td>
+        <td>${log.user_name || 'System'}</td>
+        <td>${log.action || ''}</td>
+        <td>${log.category || ''}</td>
+        <td>${(log.details || '').substring(0, 50)}${(log.details || '').length > 50 ? '...' : ''}</td>
+      </tr>
+    `).join('');
+  }
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Report ${startDate} to ${endDate}</title>
+        <style>
+          body { font-family: 'Times New Roman', Arial, sans-serif; padding: 40px; max-width: 1200px; margin: 0 auto; color: #1a1a2e; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 3px double #1a1a2e; padding-bottom: 20px; }
+          .header h1 { font-size: 24px; margin: 0; color: #1a1a2e; }
+          .header .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
+          .meta { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #1a1a2e; }
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 18px; font-weight: bold; padding: 10px 0; border-bottom: 2px solid #1a1a2e; margin-bottom: 15px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+          th { background: #f1f1f1; padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; }
+          td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+          .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+          .stat-box { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
+          .stat-box .num { font-size: 28px; font-weight: bold; color: #1a1a2e; }
+          .stat-box .label { font-size: 12px; color: #666; }
+          .footer { text-align: center; color: #999; margin-top: 30px; font-size: 11px; border-top: 1px solid #ddd; padding-top: 15px; }
+          @media print { .no-print { display: none; } body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>MURANG'A COUNTY MUNICIPAL BOARD</h1>
+          <div class="subtitle">System Report</div>
+        </div>
+        
+        <div class="meta">
+          <strong>Date Range:</strong> ${formattedStart} to ${formattedEnd}<br>
+          <strong>Generated:</strong> ${new Date().toLocaleString()}<br>
+          <strong>Generated By:</strong> ${currentUser ? currentUser.name : 'System'}
+        </div>
+        
+        ${data.stats ? `
+          <div class="section">
+            <div class="section-title">📊 Summary Statistics</div>
+            <div class="stats-grid">
+              <div class="stat-box"><div class="num">${data.stats.users_count || 0}</div><div class="label">Users</div></div>
+              <div class="stat-box"><div class="num">${data.stats.meetings_count || 0}</div><div class="label">Meetings</div></div>
+              <div class="stat-box"><div class="num">${data.stats.complaints_count || 0}</div><div class="label">Complaints</div></div>
+              <div class="stat-box"><div class="num">${data.stats.pending_complaints || 0}</div><div class="label">Pending</div></div>
+              <div class="stat-box"><div class="num">${data.stats.resolved_complaints || 0}</div><div class="label">Resolved</div></div>
+              <div class="stat-box"><div class="num">${data.stats.minutes_count || 0}</div><div class="label">Minutes</div></div>
+              <div class="stat-box"><div class="num">${data.stats.documents_count || 0}</div><div class="label">Documents</div></div>
+              <div class="stat-box"><div class="num">${data.stats.broadcasts_count || 0}</div><div class="label">Announcements</div></div>
+            </div>
+          </div>
+        ` : ''}
+        
+        ${data.auditLogs && data.auditLogs.length > 0 ? `
+          <div class="section">
+            <div class="section-title">📋 Audit Logs (${data.auditLogs.length})</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Category</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${auditRows}
+              </tbody>
+            </table>
+          </div>
+        ` : '<p style="color:#999;">No audit logs found for this period.</p>'}
+        
+        <div class="footer">
+          Report generated on ${new Date().toLocaleString()} • Page 1 of 1
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+function downloadJSON(data, startDate, endDate) {
+  const jsonData = {
+    generated_at: new Date().toISOString(),
+    date_range: { start_date: startDate, end_date: endDate },
+    generated_by: currentUser ? currentUser.name : 'System',
+    municipality: currentUser ? currentUser.municipality : null,
+    ...data
+  };
+  
+  const jsonContent = JSON.stringify(jsonData, null, 2);
+  const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `report_${startDate}_to_${endDate}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
 async function loadAuditLogs() {
   const tbody = document.getElementById('reportTableBody');
   if (!tbody) return;
@@ -6481,7 +6841,28 @@ async function loadAuditLogs() {
   `;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/reports/audit/logs?user_id=${currentUser.id}`);
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const formatDateForInput = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const startDate = formatDateForInput(thirtyDaysAgo);
+    const endDate = formatDateForInput(now);
+    
+    const params = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      user_id: currentUser.id,
+      per_page: 1000
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/reports/audit/logs?${params.toString()}`);
     const result = await response.json();
     
     if (result.logs && result.logs.length > 0) {
@@ -6501,7 +6882,7 @@ async function loadAuditLogs() {
         <tr>
           <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
             <i class="fas fa-search" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
-            No audit logs found
+            No audit logs found for the selected date range
           </td>
         </tr>
       `;
@@ -6517,6 +6898,10 @@ async function loadAuditLogs() {
       </tr>
     `;
   }
+}
+
+function refreshReports() {
+  renderReports();
 }
 
 
