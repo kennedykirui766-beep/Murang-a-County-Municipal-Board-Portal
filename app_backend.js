@@ -6296,7 +6296,7 @@ async function renderPermissions() {
   `);
 }
 
-// ============= REPORTS & AUDIT SECTION =============
+// ============= REPORTS & AUDIT SECTION (UPDATED WITH DROPDOWN MENU) =============
 
 function generateReportSummaryFromAPI(stats) {
   return {
@@ -6367,6 +6367,7 @@ async function renderReports() {
         </div>
       </div>
 
+      <!-- Dashboard Stats -->
       <div class="grid-3" style="margin-bottom:1.5rem;">
         <div class="stat-card" style="border-left-color: #2563eb;">
           <div class="num">${summary.totalUsers}</div>
@@ -6395,52 +6396,34 @@ async function renderReports() {
         </div>
       </div>
 
-      <div class="card table-wrap">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-          <span><i class="fas fa-history"></i> Audit Log</span>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <button class="btn btn-sm btn-outline" onclick="loadAuditLogs()">
-              <i class="fas fa-sync"></i> Load Logs
-            </button>
-          </div>
-        </div>
-        <div style="overflow-x:auto;">
-          <table id="reportTable">
-            <thead>
-              <tr>
-                <th>Date/Time</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Category</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody id="reportTableBody">
-              <tr>
-                <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
-                  <i class="fas fa-info-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
-                  Click "Load Logs" to view audit history
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Report Tabs - Dropdown Menu like Audit Logs -->
+      <div class="report-tabs" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-outline active" onclick="filterReports('all', event)">
+          <i class="fas fa-list"></i> All Reports
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('audit', event)">
+          <i class="fas fa-history"></i> Audit Logs
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('meetings', event)">
+          <i class="fas fa-calendar-alt"></i> Meetings
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('complaints', event)">
+          <i class="fas fa-exclamation-triangle"></i> Complaints
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('minutes', event)">
+          <i class="fas fa-file-alt"></i> Minutes
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('documents', event)">
+          <i class="fas fa-folder-open"></i> Documents
+        </button>
+        <button class="btn btn-sm btn-outline" onclick="filterReports('broadcasts', event)">
+          <i class="fas fa-bullhorn"></i> Announcements
+        </button>
       </div>
 
-      <div class="card">
-        <div class="card-title"><i class="fas fa-clock"></i> Recent Activity</div>
-        ${stats.recent_activities && stats.recent_activities.length > 0 ? 
-          stats.recent_activities.map(activity => `
-            <div style="padding:0.75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
-              <div>
-                <strong>${activity.user_name || 'System'}</strong>
-                <span style="color:var(--text-muted); margin-left:0.5rem;">${activity.description}</span>
-              </div>
-              <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(activity.timestamp)}</span>
-            </div>
-          `).join('') : 
-          '<div style="color:var(--text-muted); text-align:center; padding:1rem;">No recent activity</div>'
-        }
+      <!-- Report Content Container -->
+      <div id="reportContent">
+        ${renderReportContent('all', stats)}
       </div>
     `);
   } catch (error) {
@@ -6455,6 +6438,503 @@ async function renderReports() {
         </button>
       </div>
     `);
+  }
+}
+
+function renderReportContent(filter, stats) {
+  let content = '';
+
+  switch(filter) {
+    case 'all':
+      content = `
+        <!-- Recent Activity Summary -->
+        <div class="card" style="margin-bottom:1rem;">
+          <div class="card-title"><i class="fas fa-clock"></i> Recent Activity</div>
+          ${stats.recent_activities && stats.recent_activities.length > 0 ? 
+            stats.recent_activities.map(activity => `
+              <div style="padding:0.75rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+                <div>
+                  <strong>${activity.user_name || 'System'}</strong>
+                  <span style="color:var(--text-muted); margin-left:0.5rem;">${activity.description}</span>
+                </div>
+                <span style="color:var(--text-muted); font-size:0.85rem;">${formatDate(activity.timestamp)}</span>
+              </div>
+            `).join('') : 
+            '<div style="color:var(--text-muted); text-align:center; padding:1rem;">No recent activity</div>'
+          }
+        </div>
+
+        <!-- Audit Log Table -->
+        <div class="card table-wrap">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <span><i class="fas fa-history"></i> Audit Log</span>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-outline" onclick="loadAuditLogs()">
+                <i class="fas fa-sync"></i> Load Logs
+              </button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="reportTable">
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Category</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="reportTableBody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-info-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    Click "Load Logs" to view audit history
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      break;
+
+    case 'audit':
+      content = `
+        <div class="card table-wrap">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <span><i class="fas fa-history"></i> Audit Logs</span>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-outline" onclick="loadAuditLogs()">
+                <i class="fas fa-sync"></i> Load Logs
+              </button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="auditTable">
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Category</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-info-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    Click "Load Logs" to view audit history
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      break;
+
+    case 'meetings':
+      content = `
+        <div class="card">
+          <div class="card-title"><i class="fas fa-calendar-alt"></i> Meetings Reports</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Date</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Attendees</th>
+                </tr>
+              </thead>
+              <tbody id="meetingsReportBody">
+                <tr>
+                  <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Loading meetings...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      // Load meetings data
+      setTimeout(() => loadMeetingsReport(), 100);
+      break;
+
+    case 'complaints':
+      content = `
+        <div class="card">
+          <div class="card-title"><i class="fas fa-exclamation-triangle"></i> Complaints Reports</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Submitted By</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Assigned To</th>
+                </tr>
+              </thead>
+              <tbody id="complaintsReportBody">
+                <tr>
+                  <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Loading complaints...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      setTimeout(() => loadComplaintsReport(), 100);
+      break;
+
+    case 'minutes':
+      content = `
+        <div class="card">
+          <div class="card-title"><i class="fas fa-file-alt"></i> Minutes Reports</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Title</th>
+                  <th>Uploaded By</th>
+                  <th>Date</th>
+                  <th>Municipality</th>
+                </tr>
+              </thead>
+              <tbody id="minutesReportBody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Loading minutes...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      setTimeout(() => loadMinutesReport(), 100);
+      break;
+
+    case 'documents':
+      content = `
+        <div class="card">
+          <div class="card-title"><i class="fas fa-folder-open"></i> Documents Reports</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Uploaded By</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="documentsReportBody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Loading documents...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      setTimeout(() => loadDocumentsReport(), 100);
+      break;
+
+    case 'broadcasts':
+      content = `
+        <div class="card">
+          <div class="card-title"><i class="fas fa-bullhorn"></i> Announcements Reports</div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Message</th>
+                  <th>Sender</th>
+                  <th>Date</th>
+                  <th>Municipality</th>
+                </tr>
+              </thead>
+              <tbody id="broadcastsReportBody">
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Loading announcements...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      setTimeout(() => loadBroadcastsReport(), 100);
+      break;
+
+    default:
+      content = '<div class="card text-center text-muted" style="padding:2rem;">No reports available</div>';
+  }
+
+  return content;
+}
+
+// Filter reports by tab
+function filterReports(filter, event) {
+  if (event && event.target) {
+    document.querySelectorAll('.report-tabs .btn').forEach(btn => btn.classList.remove('active'));
+    const target = event.target.closest('.btn');
+    if (target) target.classList.add('active');
+  }
+
+  const container = document.getElementById('reportContent');
+  if (container) {
+    container.innerHTML = renderReportContent(filter, {});
+    // Reload data based on filter
+    switch(filter) {
+      case 'all':
+        loadAuditLogs();
+        break;
+      case 'audit':
+        loadAuditLogs();
+        break;
+      case 'meetings':
+        loadMeetingsReport();
+        break;
+      case 'complaints':
+        loadComplaintsReport();
+        break;
+      case 'minutes':
+        loadMinutesReport();
+        break;
+      case 'documents':
+        loadDocumentsReport();
+        break;
+      case 'broadcasts':
+        loadBroadcastsReport();
+        break;
+    }
+  }
+}
+
+// Load Meetings Report
+async function loadMeetingsReport() {
+  const tbody = document.getElementById('meetingsReportBody');
+  if (!tbody) return;
+  
+  try {
+    const meetings = getAllowedItems(await DB.meetings());
+    meetings.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    if (meetings.length) {
+      tbody.innerHTML = meetings.map((m, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${m.title}</strong></td>
+          <td>${formatDate(m.date)}</td>
+          <td>${m.location}</td>
+          <td><span class="badge ${m.status === 'scheduled' ? 'badge-info' : m.status === 'completed' ? 'badge-success' : 'badge-warning'}">${m.status}</span></td>
+          <td>${m.attendees ? m.attendees.length : 0}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No meetings found</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);">Error loading meetings</td></tr>`;
+  }
+}
+
+// Load Complaints Report
+async function loadComplaintsReport() {
+  const tbody = document.getElementById('complaintsReportBody');
+  if (!tbody) return;
+  
+  try {
+    const complaints = getAllowedItems(await DB.complaints());
+    complaints.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    if (complaints.length) {
+      tbody.innerHTML = complaints.map((c, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${c.title}</strong></td>
+          <td>${c.submittedBy || 'Unknown'}</td>
+          <td>${formatDate(c.date)}</td>
+          <td><span class="badge ${c.status === 'pending' ? 'badge-danger' : c.status === 'in_progress' ? 'badge-warning' : 'badge-success'}">${c.status.replace('_', ' ')}</span></td>
+          <td>${c.assignedTo || 'Unassigned'}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No complaints found</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--danger);">Error loading complaints</td></tr>`;
+  }
+}
+
+// Load Minutes Report
+async function loadMinutesReport() {
+  const tbody = document.getElementById('minutesReportBody');
+  if (!tbody) return;
+  
+  try {
+    const minutes = getAllowedItems(await DB.minutes());
+    minutes.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+    
+    if (minutes.length) {
+      tbody.innerHTML = minutes.map((m, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${m.title || 'Untitled'}</strong></td>
+          <td>${m.uploadedBy || 'Unknown'}</td>
+          <td>${formatDate(m.uploadDate)}</td>
+          <td>${getMunicipalityLabel(m.municipality)}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No minutes found</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);">Error loading minutes</td></tr>`;
+  }
+}
+
+// Load Documents Report
+async function loadDocumentsReport() {
+  const tbody = document.getElementById('documentsReportBody');
+  if (!tbody) return;
+  
+  try {
+    const documents = getAllowedItems(await DB.documents());
+    documents.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+    
+    if (documents.length) {
+      tbody.innerHTML = documents.map((d, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${d.name}</strong></td>
+          <td>${d.type || 'Unknown'}</td>
+          <td>${d.uploadedBy || 'Unknown'}</td>
+          <td>${formatDate(d.uploadDate)}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No documents found</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);">Error loading documents</td></tr>`;
+  }
+}
+
+// Load Broadcasts Report
+async function loadBroadcastsReport() {
+  const tbody = document.getElementById('broadcastsReportBody');
+  if (!tbody) return;
+  
+  try {
+    const broadcasts = getAllowedItems(await DB.broadcasts());
+    broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    if (broadcasts.length) {
+      tbody.innerHTML = broadcasts.map((b, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${b.message.substring(0, 50)}${b.message.length > 50 ? '...' : ''}</strong></td>
+          <td>${b.sender || 'Unknown'}</td>
+          <td>${formatDate(b.timestamp)}</td>
+          <td>${getMunicipalityLabel(b.municipality)}</td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No announcements found</td></tr>`;
+    }
+  } catch (error) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);">Error loading announcements</td></tr>`;
+  }
+}
+
+// Load Audit Logs for Reports
+async function loadAuditLogs() {
+  const tbody = document.getElementById('reportTableBody') || document.getElementById('auditTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" style="text-align:center;padding:1rem;color:var(--text-muted);">
+        <i class="fas fa-spinner fa-spin"></i> Loading audit logs...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const formatDateForInput = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const startDate = formatDateForInput(thirtyDaysAgo);
+    const endDate = formatDateForInput(now);
+    
+    const params = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      user_id: currentUser.id,
+      per_page: 1000
+    });
+    
+    const response = await fetch(`${API_BASE_URL}/reports/audit/logs?${params.toString()}`);
+    const result = await response.json();
+    
+    if (result.logs && result.logs.length > 0) {
+      tbody.innerHTML = result.logs.map(log => `
+        <tr>
+          <td>${formatDate(log.timestamp)} ${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</td>
+          <td><strong>${log.user_name}</strong><br /><span style="font-size:0.75rem;color:var(--text-muted);">${log.user_email}</span></td>
+          <td><span class="badge badge-info">${log.action}</span></td>
+          <td>${log.category}</td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${log.details || ''}">
+            ${log.details ? log.details.substring(0, 100) : 'No details'}
+          </td>
+        </tr>
+      `).join('');
+    } else {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
+            <i class="fas fa-search" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+            No audit logs found for the selected date range
+          </td>
+        </tr>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading audit logs:', error);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center;padding:2rem;color:var(--danger);">
+          <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+          Error loading audit logs: ${error.message || 'Unknown error'}
+        </td>
+      </tr>
+    `;
   }
 }
 
@@ -6556,7 +7036,7 @@ function showExportModal() {
           </label>
         </div>
         
-        <!-- Action Buttons - IMPROVED STYLING -->
+        <!-- Action Buttons -->
         <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.5rem;">
           <button type="submit" class="btn btn-success" style="flex:1; min-width:120px; padding:0.75rem 1.5rem; font-weight:600; border-radius:10px; display:flex; align-items:center; justify-content:center; gap:0.5rem; background:var(--success); color:white; border:none; cursor:pointer; transition:all 0.3s;">
             <i class="fas fa-download"></i> Export
@@ -6611,6 +7091,7 @@ function showExportModal() {
     }
   });
 }
+
 function setExportDateRange(days) {
   const endDate = new Date();
   const startDate = new Date();
@@ -6828,76 +7309,9 @@ function downloadJSON(data, startDate, endDate) {
   URL.revokeObjectURL(link.href);
 }
 
-async function loadAuditLogs() {
-  const tbody = document.getElementById('reportTableBody');
-  if (!tbody) return;
-
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="5" style="text-align:center;padding:1rem;color:var(--text-muted);">
-        <i class="fas fa-spinner fa-spin"></i> Loading audit logs...
-      </td>
-    </tr>
-  `;
-
-  try {
-    const now = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const formatDateForInput = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
-    const startDate = formatDateForInput(thirtyDaysAgo);
-    const endDate = formatDateForInput(now);
-    
-    const params = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
-      user_id: currentUser.id,
-      per_page: 1000
-    });
-    
-    const response = await fetch(`${API_BASE_URL}/reports/audit/logs?${params.toString()}`);
-    const result = await response.json();
-    
-    if (result.logs && result.logs.length > 0) {
-      tbody.innerHTML = result.logs.map(log => `
-        <tr>
-          <td>${formatDate(log.timestamp)} ${log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}</td>
-          <td><strong>${log.user_name}</strong><br /><span style="font-size:0.75rem;color:var(--text-muted);">${log.user_email}</span></td>
-          <td><span class="badge badge-info">${log.action}</span></td>
-          <td>${log.category}</td>
-          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${log.details || ''}">
-            ${log.details ? log.details.substring(0, 100) : 'No details'}
-          </td>
-        </tr>
-      `).join('');
-    } else {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted);">
-            <i class="fas fa-search" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
-            No audit logs found for the selected date range
-          </td>
-        </tr>
-      `;
-    }
-  } catch (error) {
-    console.error('Error loading audit logs:', error);
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" style="text-align:center;padding:2rem;color:var(--danger);">
-          <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
-          Error loading audit logs: ${error.message || 'Unknown error'}
-        </td>
-      </tr>
-    `;
-  }
+// Legacy loadAuditLogs function for backward compatibility
+async function loadAuditLogsLegacy() {
+  await loadAuditLogs();
 }
 
 function refreshReports() {
