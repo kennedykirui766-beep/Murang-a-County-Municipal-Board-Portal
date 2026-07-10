@@ -156,7 +156,8 @@ function getRoleLabel(role) {
     municipal_officer: 'Municipal Officer',
     member: 'Member',
     department_officer: 'Department Officer',
-    social_officer: 'Social Officer'
+    social_officer: 'Social Officer',
+    secretary: 'Secretary'
   }[role] || role;
 }
 
@@ -174,7 +175,7 @@ function isSystemAdmin(user) {
 }
 
 function canManageAll(user) {
-  return user && (user.role === 'super_admin' || user.role === 'social_officer');
+  return user && (user.role === 'super_admin' || user.role === 'social_officer' || user.role === 'secretary');
 }
 
 function getAllowedItems(items, key = 'municipality') {
@@ -827,7 +828,7 @@ async function renderDashboard() {
 
 async function renderMembers() {
   const members = getAllowedItems(await DB.members());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
   render(`
     <div class="page-header">
       <h2><i class="fas fa-users"></i> Board Members</h2>
@@ -857,7 +858,9 @@ async function showAddMemberModal() {
   const municipalities = canManageAll(currentUser) ? ['kenol', 'kangare', 'muranga_town', 'all'] : [currentUser.municipality];
   let roleOptions = ['member'];
   if (currentUser.role === 'super_admin') {
-    roleOptions = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
+    roleOptions = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer', 'secretary'];
+  } else if (currentUser.role === 'secretary') {
+    roleOptions = ['member', 'department_officer', 'social_officer'];
   }
 
   showModal(`
@@ -1296,7 +1299,7 @@ function downloadMeetingFile(meetingId, fileIndex) {
 
 async function renderMeetings() {
   const meetings = getAllowedItems(await DB.meetings());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
   
   meetings.sort((a, b) => new Date(a.date) - new Date(b.date));
   
@@ -1319,6 +1322,7 @@ async function renderMeetings() {
         const canGenerateQR = currentUser && (
           currentUser.role === 'super_admin' || 
           currentUser.role === 'municipal_officer' ||
+          currentUser.role === 'secretary' ||
           (meeting.createdBy && meeting.createdBy === currentUser.id)
         );
         
@@ -3058,7 +3062,7 @@ async function showUploadMinutesModal() {
 
 async function renderMinutes() {
   const minutes = getAllowedItems(await DB.minutes());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
   
   minutes.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
   
@@ -3321,10 +3325,11 @@ async function renderComplaints() {
   
   const socialOfficers = users.filter(u => u.role === 'social_officer');
   const departmentOfficers = users.filter(u => u.role === 'department_officer');
-  const allAssignable = [...socialOfficers, ...departmentOfficers];
+  const secretaries = users.filter(u => u.role === 'secretary');
+  const allAssignable = [...socialOfficers, ...departmentOfficers, ...secretaries];
   
-  const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
-  const canSubmit = currentUser.role === 'member' || currentUser.role === 'department_officer' || currentUser.role === 'social_officer' || currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
+  const canSubmit = currentUser.role === 'member' || currentUser.role === 'department_officer' || currentUser.role === 'social_officer' || currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
   
   const assignableByMuni = {};
   allAssignable.forEach(officer => {
@@ -3377,6 +3382,9 @@ async function renderComplaints() {
               </optgroup>
               <optgroup label="Department Officers">
                 ${availableOfficers.filter(o => o.role === 'department_officer').map(o => `<option value="${o.name}" data-role="department_officer">${o.name} (${o.email})</option>`).join('')}
+              </optgroup>
+              <optgroup label="Secretaries">
+                ${availableOfficers.filter(o => o.role === 'secretary').map(o => `<option value="${o.name}" data-role="secretary">${o.name} (${o.email})</option>`).join('')}
               </optgroup>
             </select>
             <button class="btn btn-success btn-sm" onclick="assignComplaint(${c.id})"><i class="fas fa-user-check"></i> Assign</button>
@@ -3659,7 +3667,7 @@ async function renderBroadcasts() {
   const broadcasts = getAllowedItems(await DB.broadcasts());
   broadcasts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   
-  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer';
+  const isAdmin = currentUser.role === 'super_admin' || currentUser.role === 'municipal_officer' || currentUser.role === 'secretary';
   
   render(`
     <div class="page-header">
@@ -4256,7 +4264,7 @@ async function deleteDocument(id) {
 // Render Documents with View, Download, and Delete buttons
 async function renderDocuments() {
   const documents = getAllowedItems(await DB.documents());
-  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+  const canAdd = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
   const isAdmin = canAdd;
   
   documents.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
@@ -4524,7 +4532,7 @@ async function renderTrackUsers() {
 }
 
 async function showAddUserModal() {
-  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
+  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer', 'secretary'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
     <h3><i class="fas fa-user-plus"></i> Create User Account</h3>
@@ -4574,7 +4582,7 @@ async function editUser(id) {
 }
 
 function showEditUserModal(user) {
-  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
+  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer', 'secretary'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   showModal(`
     <h3><i class="fas fa-user-edit"></i> Edit User Account</h3>
@@ -4708,6 +4716,15 @@ const DEFAULT_PERMISSION_SETS = {
     'view_complaints',
     'view_documents',
     'view_broadcasts'
+  ],
+  'secretary': [
+    'view_members', 'manage_members',
+    'schedule_meetings', 'view_meetings',
+    'upload_minutes', 'view_minutes',
+    'manage_complaints', 'view_complaints',
+    'upload_documents', 'view_documents',
+    'view_users',
+    'manage_broadcasts', 'view_broadcasts'
   ]
 };
 
@@ -4774,6 +4791,7 @@ async function showPromoteUserModal(userId) {
     { value: 'municipal_officer', label: 'Municipal Officer' },
     { value: 'department_officer', label: 'Department Officer' },
     { value: 'social_officer', label: 'Social Officer' },
+    { value: 'secretary', label: 'Secretary' },
     { value: 'member', label: 'Member' }
   ];
   
@@ -5037,7 +5055,7 @@ async function renderUsers() {
 // Override showAddUserModal to include permissions
 const originalShowAddUserModal = showAddUserModal;
 showAddUserModal = async function() {
-  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer'];
+  const roles = ['super_admin', 'municipal_officer', 'member', 'social_officer', 'department_officer', 'secretary'];
   const municipalities = ['kenol', 'kangare', 'muranga_town', 'all'];
   
   showModal(`
@@ -6076,6 +6094,30 @@ const DEFAULT_PERMISSIONS = {
     PERMISSIONS.VIEW_EMAILS,
     PERMISSIONS.SUBMIT_COMPLAINTS,
     PERMISSIONS.SCAN_QR
+  ],
+  
+  secretary: [
+    PERMISSIONS.VIEW_USERS,
+    PERMISSIONS.MANAGE_MEMBERS,
+    PERMISSIONS.VIEW_MEMBERS,
+    PERMISSIONS.MANAGE_MEETINGS,
+    PERMISSIONS.VIEW_MEETINGS,
+    PERMISSIONS.SCHEDULE_MEETINGS,
+    PERMISSIONS.MANAGE_MINUTES,
+    PERMISSIONS.VIEW_MINUTES,
+    PERMISSIONS.UPLOAD_MINUTES,
+    PERMISSIONS.MANAGE_COMPLAINTS,
+    PERMISSIONS.VIEW_COMPLAINTS,
+    PERMISSIONS.RESOLVE_COMPLAINTS,
+    PERMISSIONS.ASSIGN_COMPLAINTS,
+    PERMISSIONS.MANAGE_DOCUMENTS,
+    PERMISSIONS.VIEW_DOCUMENTS,
+    PERMISSIONS.UPLOAD_DOCUMENTS,
+    PERMISSIONS.SEND_EMAILS,
+    PERMISSIONS.VIEW_EMAILS,
+    PERMISSIONS.SEND_BROADCASTS,
+    PERMISSIONS.GENERATE_QR,
+    PERMISSIONS.SCAN_QR
   ]
 };
 
@@ -6205,7 +6247,7 @@ async function renderPermissions() {
   }
 
   const users = await DB.users();
-  const roles = ['super_admin', 'municipal_officer', 'social_officer', 'department_officer', 'member'];
+  const roles = ['super_admin', 'municipal_officer', 'social_officer', 'department_officer', 'member', 'secretary'];
   
   render(`
     <div class="page-header">
@@ -6287,6 +6329,10 @@ async function renderPermissions() {
           <strong style="color:#d97706;">📋 Department Officer</strong>
           <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Can view data and submit complaints, but has limited management privileges.</p>
         </div>
+        <div style="padding:0.75rem; background:var(--surface-alt); border-radius:8px; border-left:3px solid #8b5cf6;">
+          <strong style="color:#8b5cf6;">📝 Secretary</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Manages meetings, minutes, documents, and announcements. Can assign complaints.</p>
+        </div>
         <div style="padding:0.75rem; background:var(--surface-alt); border-radius:8px; border-left:3px solid #6b7280;">
           <strong style="color:#6b7280;">👤 Member</strong>
           <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Basic access: view information and submit complaints.</p>
@@ -6320,12 +6366,12 @@ function generateReportSummaryFromAPI(stats) {
 }
 
 async function renderReports() {
-  if (!isSystemAdmin(currentUser) && currentUser.role !== 'municipal_officer') {
+  if (!isSystemAdmin(currentUser) && currentUser.role !== 'municipal_officer' && currentUser.role !== 'secretary') {
     render(`
       <div class="card" style="text-align:center; padding:3rem;">
         <i class="fas fa-lock" style="font-size:3rem; color:var(--danger); margin-bottom:1rem;"></i>
         <h2>Access Denied</h2>
-        <p style="color:var(--text-muted);">Only Administrators and Municipal Officers can access reports.</p>
+        <p style="color:var(--text-muted);">Only Administrators, Municipal Officers, and Secretaries can access reports.</p>
       </div>
     `);
     return;
@@ -8142,7 +8188,7 @@ async function bulkAttendanceModal(meetingId) {
 // ============ PROJECT MANAGEMENT ============
 
 async function renderProjects() {
-    const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+    const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
     const municipality = currentUser.municipality === 'all' ? '' : currentUser.municipality;
     
     try {
@@ -8390,7 +8436,7 @@ async function viewProject(projectId) {
         const updatesResponse = await fetch(`${API_BASE_URL}/projects/${projectId}/updates`);
         const updates = await updatesResponse.json();
         
-        const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin';
+        const canManage = currentUser.role === 'municipal_officer' || currentUser.role === 'super_admin' || currentUser.role === 'secretary';
         
         showModal(`
             <div style="max-height:80vh; overflow-y:auto; padding-right:0.5rem;">
